@@ -1,7 +1,6 @@
 name: 'Feed2Pages Action'
 description: 'Collect content for a Hugo Blogroll'
 author: 'Robert Alexander (robalexdev.com)'
-inputs:
 runs:
   using: "docker"
   image: "docker://ghcr.io/ralexander-phi/Feed2PagesAction:latest"
