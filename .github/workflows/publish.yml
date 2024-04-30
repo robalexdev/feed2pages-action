@@ -7,14 +7,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: echo ::set-env name=RELEASE_VERSION::$(echo $GITHUB_REF | cut -d / -f 3)
-        env:
-          ACTIONS_ALLOW_UNSECURE_COMMANDS: true
-      - uses: elgohr/Publish-Docker-Github-Action@v5
+      - uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          default_branch: main
-          name: ralexander-phi/Feed2PagesAction
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-          tags: "latest,${{ env.RELEASE_VERSION }}"
+      - uses: docker/build-push-action@v5
+        with:
+          push: true
+          tags: ghcr.io/${{ github.repository }}:latest
