@@ -8,6 +8,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: echo ::set-env name=RELEASE_VERSION::$(echo $GITHUB_REF | cut -d / -f 3)
+        env:
+          ACTIONS_ALLOW_UNSECURE_COMMANDS: true
       - uses: elgohr/Publish-Docker-Github-Action@v5
         with:
           registry: ghcr.io
