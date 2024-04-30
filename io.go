@@ -60,7 +60,7 @@ func writeYaml(o any, path string) {
 	output = append(sep, output...)
 	output = append(output, sep...)
 
-	err = os.WriteFile(path, output, os.FileMode(int(0660)))
+	err = os.WriteFile(path, output, os.FileMode(int(0644)))
 	if err != nil {
 		panicStringsErr("Unable to write file", path, err)
 	}

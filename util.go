@@ -33,7 +33,7 @@ func containsAny(search string, targets ...string) (bool, string) {
 }
 
 func mkdirIfNotExists(path string) {
-	err := os.MkdirAll(path, 0770)
+	err := os.MkdirAll(path, 0755)
 	if err != nil {
 		panicStringsErr("Unable to create directory", path, err)
 	}
