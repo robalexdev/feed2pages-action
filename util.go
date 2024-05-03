@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/go-yaml/yaml"
-	"io/ioutil"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -41,13 +41,13 @@ func mkdirIfNotExists(path string) {
 }
 
 func rmGenerated(path string) {
-	files, err := ioutil.ReadDir(path)
+	files, err := os.ReadDir(path)
 	if err != nil {
 		panicf("Unable to read directory: %s: %e", path, err)
 	}
 	for _, f := range files {
 		if strings.HasPrefix(f.Name(), GENERATED_FILE_PREFIX) {
-			os.Remove(f.Name())
+			os.Remove(filepath.Join(path, f.Name()))
 		}
 	}
 }
@@ -151,6 +151,10 @@ func errMissingField(field string) error {
 
 func errBlockWord(field string, word string) error {
 	return errors.New(fmt.Sprintf("Skipping: %s content contains block word: %s", field, word))
+}
+
+func errBlockPost(field string, title string) error {
+	return errors.New(fmt.Sprintf("Skipping: '%s': blocked by %s", title, field))
 }
 
 func unixEpoc() time.Time {
