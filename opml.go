@@ -46,14 +46,14 @@ func asDetails(outlines []XmlOutline) []FeedDetails {
 func parseOpml(url string) []FeedDetails {
 	content, closer, err := readUrl(url)
 	if err != nil {
-		panicStringsErr("Error reading URL", url, err)
+		panicf("Error reading URL: %s: %e", url, err)
 	}
 	defer closer.Close()
 	decoder := xml.NewDecoder(content)
 	opml := XmlOpml{}
 	err = decoder.Decode(&opml)
 	if err != nil {
-		panicStringErr("Error decoding OMPL", err)
+		panicf("Error decoding OMPL: %e", err)
 	}
 	fmt.Printf("OPML parsed as: %v\n", opml)
 	return asDetails(opml.Body.Outline)

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/go-yaml/yaml"
+	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
@@ -35,14 +36,19 @@ func containsAny(search string, targets ...string) (bool, string) {
 func mkdirIfNotExists(path string) {
 	err := os.MkdirAll(path, 0755)
 	if err != nil {
-		panicStringsErr("Unable to create directory", path, err)
+		panicf("Unable to create directory: %s: %e", path, err)
 	}
 }
 
-func rmdir(path string) {
-	err := os.RemoveAll(path)
+func rmGenerated(path string) {
+	files, err := ioutil.ReadDir(path)
 	if err != nil {
-		panicStringsErr("Unable to remove directory", path, err)
+		panicf("Unable to read directory: %s: %e", path, err)
+	}
+	for _, f := range files {
+		if strings.HasPrefix(f.Name(), GENERATED_FILE_PREFIX) {
+			os.Remove(f.Name())
+		}
 	}
 }
 
@@ -75,7 +81,7 @@ func pretty(duration time.Duration) string {
 	}
 }
 
-func firstNonEmpty(options []string) string {
+func firstNonEmpty(options ...string) string {
 	for _, option := range options {
 		if !isEmpty(option) {
 			return strings.TrimSpace(option)
@@ -91,14 +97,14 @@ func isEmpty(s string) bool {
 func parseConfig() Config {
 	content, closer, err := readFile("feeds.yaml")
 	if err != nil {
-		panicStringErr("Unable to parse config", err)
+		panicf("Unable to parse config: %e", err)
 	}
 	defer closer.Close()
 	config := Config{}
 	decoder := yaml.NewDecoder(content)
 	err = decoder.Decode(&config)
 	if err != nil {
-		panicStringErr("Config decode error", err)
+		panicf("Config decode error: %e", err)
 	}
 	// Parse the OPML file (local file or remote resource)
 	config.Feeds = parseOpml(config.FeedUrl)
@@ -135,16 +141,8 @@ func truncateText(s string, max int) string {
 	return s[:strings.LastIndexAny(s[:max], " .,:;-")]
 }
 
-func panicStringErr(s string, err error) {
-	panic(fmt.Sprintf("%s: %e", s, err))
-}
-
-func panicStringsErr(s1, s2 string, err error) {
-	panic(fmt.Sprintf("%s: %s: %e", s1, s2, err))
-}
-
-func panicErr(err error) {
-	panic(fmt.Sprintf("%e", err))
+func panicf(f string, a ...any) {
+	panic(fmt.Sprintf(f, a...))
 }
 
 func errMissingField(field string) error {

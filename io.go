@@ -52,7 +52,7 @@ func readFile(path string) (io.Reader, io.Closer, error) {
 func writeYaml(o any, path string) {
 	output, err := yaml.Marshal(o)
 	if err != nil {
-		panicStringErr("YAML error", err)
+		panicf("YAML error: %e", err)
 	}
 
 	// Markdown uses `---` for YAML frontmatter
@@ -62,7 +62,7 @@ func writeYaml(o any, path string) {
 
 	err = os.WriteFile(path, output, os.FileMode(int(0644)))
 	if err != nil {
-		panicStringsErr("Unable to write file", path, err)
+		panicf("Unable to write file: %s: %e", path, err)
 	}
 }
 

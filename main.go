@@ -66,10 +66,9 @@ func processPost(item *MultiTypeItem, feed *gofeed.Feed, config Config) (PostFro
 	//  - description from the feed
 	//  - the content from the feed
 	out.Params.Post.Description = firstNonEmpty(
-		[]string{
 			out.Params.Post.Description,
 			out.Params.Post.Content,
-		})
+		)
 
 	err := filterPost(item, config)
 	if err != nil {
@@ -133,10 +132,10 @@ func processFeed(feedId string, feedDetails FeedDetails, config Config) ([]PostF
 }
 
 func main() {
-	rmdir(POST_FOLDER_PATH)
-	rmdir(FEED_FOLDER_PATH)
 	mkdirIfNotExists(POST_FOLDER_PATH)
 	mkdirIfNotExists(FEED_FOLDER_PATH)
+	rmGenerated(POST_FOLDER_PATH)
+	rmGenerated(FEED_FOLDER_PATH)
 	config := parseConfig()
 	allPosts := []PostFrontmatter{}
 	allFeeds := []FeedFrontmatter{}
@@ -152,11 +151,11 @@ func main() {
 	allPosts = sortAndLimitPosts(allPosts, *config.MaxPosts)
 	fmt.Printf("Total %d posts\n", len(allPosts))
 	for _, feed := range allFeeds {
-		path := fmt.Sprintf("%s/%s.md", FEED_FOLDER_PATH, feed.Params.Id)
+		path := fmt.Sprintf("%s/%s%s.md", FEED_FOLDER_PATH, GENERATED_FILE_PREFIX, feed.Params.Id)
 		writeYaml(feed, path)
 	}
 	for _, post := range allPosts {
-		path := fmt.Sprintf("%s/%s.md", POST_FOLDER_PATH, safeGUID(post))
+		path := fmt.Sprintf("%s/%s%s.md", POST_FOLDER_PATH, GENERATED_FILE_PREFIX, safeGUID(post))
 		writeYaml(post, path)
 	}
 }
