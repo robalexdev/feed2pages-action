@@ -72,6 +72,9 @@ Software that supports this syntax can help readers of your blog discover what y
 
 `block_posts`: Individual posts that match these titles, GUIDs, or link URLs will be filtered out.
 
+`post_folder_name`: Change this if you'd like posts to go in a different folder. Default: reading
+
+`feed_folder_name`: Change this if you'd like feeds to go in a different folder. Default: following
 
 ## How it works
 

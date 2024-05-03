@@ -14,6 +14,8 @@ type Config struct {
 	BlockWords       []string `yaml:"block_words"`
 	BlockDomains     []string `yaml:"block_domains"`
 	BlockPosts       []string `yaml:"block_posts"`
+	PostFolderName   string   `yaml:"post_folder_name"`
+	FeedFolderName   string   `yaml:"feed_folder_name"`
 }
 
 type FeedDetails struct {

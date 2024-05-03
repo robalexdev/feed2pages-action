@@ -160,3 +160,12 @@ func errBlockPost(field string, title string) error {
 func unixEpoc() time.Time {
 	return time.Date(1970, time.January, 1, 0, 0, 0, 0, time.UTC)
 }
+
+func contentPath(folder string) string {
+	return filepath.Join("content", folder)
+}
+
+func generatedFilePath(basePath, id string) string {
+	name := fmt.Sprintf("%s%s.md", GENERATED_FILE_PREFIX, id)
+	return filepath.Join(basePath, name)
+}

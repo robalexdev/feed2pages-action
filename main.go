@@ -8,9 +8,6 @@ import (
 	"time"
 )
 
-const POST_FOLDER_PATH = "content/post"
-const FEED_FOLDER_PATH = "content/feed"
-
 func filterPost(item *MultiTypeItem, config Config) error {
 	// Missing required fields
 	if item.item.PublishedParsed == nil {
@@ -144,11 +141,15 @@ func processFeed(feedId string, feedDetails FeedDetails, config Config) ([]PostF
 }
 
 func main() {
-	mkdirIfNotExists(POST_FOLDER_PATH)
-	mkdirIfNotExists(FEED_FOLDER_PATH)
-	rmGenerated(POST_FOLDER_PATH)
-	rmGenerated(FEED_FOLDER_PATH)
 	config := parseConfig()
+
+	postOutputPath := contentPath(firstNonEmpty(config.PostFolderName, DEFAULT_POST_FOLDER))
+	feedOutputPath := contentPath(firstNonEmpty(config.FeedFolderName, DEFAULT_FEED_FOLDER))
+	mkdirIfNotExists(postOutputPath)
+	mkdirIfNotExists(feedOutputPath)
+	rmGenerated(postOutputPath)
+	rmGenerated(feedOutputPath)
+
 	allPosts := []PostFrontmatter{}
 	allFeeds := []FeedFrontmatter{}
 	for id, feedDetails := range config.Feeds {
@@ -163,11 +164,11 @@ func main() {
 	allPosts = sortAndLimitPosts(allPosts, *config.MaxPosts)
 	fmt.Printf("Total %d posts\n", len(allPosts))
 	for _, feed := range allFeeds {
-		path := fmt.Sprintf("%s/%s%s.md", FEED_FOLDER_PATH, GENERATED_FILE_PREFIX, feed.Params.Id)
+		path := generatedFilePath(feedOutputPath, feed.Params.Id)
 		writeYaml(feed, path)
 	}
 	for _, post := range allPosts {
-		path := fmt.Sprintf("%s/%s%s.md", POST_FOLDER_PATH, GENERATED_FILE_PREFIX, safeGUID(post))
+		path := generatedFilePath(postOutputPath, safeGUID(post))
 		writeYaml(post, path)
 	}
 }
