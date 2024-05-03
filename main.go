@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/mmcdole/gofeed"
+	"slices"
 	"time"
 )
 
@@ -31,6 +32,17 @@ func filterPost(item *MultiTypeItem, config Config) error {
 	}
 	if has, which := containsAny(item.item.Content, config.BlockWords...); has {
 		return errBlockWord("Content", which)
+	}
+
+	// Blocked posts by title, GUID, or link
+	if slices.Contains(config.BlockPosts, item.item.GUID) {
+		return errBlockPost("GUID", item.item.Title)
+	}
+	if slices.Contains(config.BlockPosts, item.item.Title) {
+		return errBlockPost("Title", item.item.Title)
+	}
+	if slices.Contains(config.BlockPosts, item.item.Link) {
+		return errBlockPost("Link", item.item.Title)
 	}
 
 	// Blocked domains
@@ -66,9 +78,9 @@ func processPost(item *MultiTypeItem, feed *gofeed.Feed, config Config) (PostFro
 	//  - description from the feed
 	//  - the content from the feed
 	out.Params.Post.Description = firstNonEmpty(
-			out.Params.Post.Description,
-			out.Params.Post.Content,
-		)
+		out.Params.Post.Description,
+		out.Params.Post.Content,
+	)
 
 	err := filterPost(item, config)
 	if err != nil {

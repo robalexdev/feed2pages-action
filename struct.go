@@ -13,6 +13,7 @@ type Config struct {
 	MaxPosts         *int     `yaml:"max_posts"`
 	BlockWords       []string `yaml:"block_words"`
 	BlockDomains     []string `yaml:"block_domains"`
+	BlockPosts       []string `yaml:"block_posts"`
 }
 
 type FeedDetails struct {

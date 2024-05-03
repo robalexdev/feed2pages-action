@@ -70,6 +70,8 @@ Software that supports this syntax can help readers of your blog discover what y
 
 `block_domains`: Articles from this domain, or subdomains of this domain, will be filtered out.
 
+`block_posts`: Individual posts that match these titles, GUIDs, or link URLs will be filtered out.
+
 
 ## How it works
 
