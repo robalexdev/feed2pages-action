@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/go-yaml/yaml"
 	"github.com/mmcdole/gofeed"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -194,8 +195,10 @@ func bestFeedDate(feed *gofeed.Feed) string {
 	return ""
 }
 
-func processBlogroll(feed *gofeed.Feed) []PendingDiscover {
+// Check the RSS feed for source:blogroll entries
+func processBlogrollBySourceBlogroll(feed *gofeed.Feed) []PendingDiscover {
 	discoverUrls := []PendingDiscover{}
+	// TODO: what if the namespace uses a different name?
 	if sourceNS, has := feed.Extensions["source"]; has {
 		if blogrolls, has := sourceNS["blogroll"]; has {
 			for _, blogroll := range blogrolls {
@@ -207,6 +210,89 @@ func processBlogroll(feed *gofeed.Feed) []PendingDiscover {
 		}
 	}
 	return discoverUrls
+}
+
+func processBlogrollByWellKnownOpml(feed *gofeed.Feed) []PendingDiscover {
+	if feed.Link == "" {
+		return nil
+	}
+
+	url, err := url.Parse(feed.Link)
+	if err != nil {
+		fmt.Printf("URL parsing error: %e\n", err)
+		return nil
+	}
+
+	domain := url.Scheme + "://" + url.Host
+	wellKnown := domain + WELL_KNOWN_RECOMMENDATIONS_OPML
+	if !httpHeadOk(wellKnown) {
+		wellKnown = domain + WELL_KNOWN_RECOMMENDATIONS_JSON
+		if httpHeadOk(wellKnown) {
+			fmt.Printf("JSON recommendations not yet supported: %s\n", domain)
+			return nil
+		} else {
+			// No well known file found
+			return nil
+		}
+	}
+	discovered := PendingDiscover{}
+	discovered.RecommendedBy = feed.Link
+	discovered.Link = wellKnown
+	return []PendingDiscover{
+		discovered,
+	}
+}
+
+func processBlogrollByRelLink(feed *gofeed.Feed) []PendingDiscover {
+	discoverUrls := []PendingDiscover{}
+	if feed.Link == "" {
+		return nil
+	}
+
+	body, err := httpGet(feed.Link)
+	if err != nil {
+		fmt.Printf("Unable to get feed link: %s: %e\n", feed.Link, err)
+		return nil
+	}
+	defer body.Close()
+	links, err := parseLinks(body)
+	if err != nil {
+		fmt.Printf("Unable to parse links in page: %s: %e\n", feed.Link, err)
+		return nil
+	}
+
+	for _, link := range links {
+		if link.Rel == "blogroll" {
+			discovered := PendingDiscover{}
+			discovered.RecommendedBy = feed.Link
+			discovered.Link = link.Href
+			if !strings.Contains(discovered.Link, "://") {
+				// relative URL
+				if strings.HasPrefix(discovered.Link, "/") {
+					discovered.Link = feed.Link + discovered.Link
+				} else {
+					discovered.Link = feed.Link + "/" + discovered.Link
+				}
+			}
+			discoverUrls = append(discoverUrls, discovered)
+		}
+	}
+	return discoverUrls
+}
+
+func processBlogroll(feed *gofeed.Feed) []PendingDiscover {
+	// Prefer blogroll specified in the RSS feed
+	discoveredUrls := processBlogrollBySourceBlogroll(feed)
+	if len(discoveredUrls) > 0 {
+		return discoveredUrls
+	}
+	// Fall back to well known URLs
+	//discoveredUrls = processBlogrollByWellKnownOpml(feed)
+	//if len(discoveredUrls) > 0 {
+	//	return discoveredUrls
+	//}
+	// Finally check link rel=blogroll
+	return processBlogrollByRelLink(feed)
 }
 
 func sortDedupePendingDiscover(in []PendingDiscover) []PendingDiscover {
@@ -239,6 +325,19 @@ func sortAndDedupeFeedDetails(in []FeedDetails) []FeedDetails {
 	return out
 }
 
+func parseFeedFromUrl(url string) (*gofeed.Feed, error) {
+	fp := gofeed.NewParser()
+	fp.RSSTranslator = NewCommentsTranslator()
+
+	resp, err := httpGet(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Close()
+
+	return fp.Parse(resp)
+}
+
 func discoverMoreFeeds(opmlUrls []PendingDiscover, config Config) []DiscoverFrontmatter {
 	if config.DiscoverDepth == nil {
 		fmt.Println("Skipping discovery, discover_depth is not set")
@@ -247,8 +346,8 @@ func discoverMoreFeeds(opmlUrls []PendingDiscover, config Config) []DiscoverFron
 		fmt.Println("Skipping discovery, discover_depth is < 1")
 		return nil
 	}
-	fp := NewParser()
-	id := -1
+
+	id := 0
 	remainingDepth := *config.DiscoverDepth
 	remainingRecs := 1000
 	if config.MaxRecommendations != nil {
@@ -296,7 +395,7 @@ func discoverMoreFeeds(opmlUrls []PendingDiscover, config Config) []DiscoverFron
 						continue
 					}
 
-					feed, _, err := fp.ParseURLExtended(feedDetail.Link)
+					feed, err := parseFeedFromUrl(feedDetail.Link)
 					if err != nil {
 						fmt.Printf("Skipping feed: %s: %e\n", feedDetail.Link, err)
 						// TODO add to collected somehow

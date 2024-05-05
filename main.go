@@ -8,56 +8,56 @@ import (
 	"time"
 )
 
-func filterPost(item *MultiTypeItem, config Config) error {
+func filterPost(item *gofeed.Item, config Config) error {
 	// Missing required fields
-	if item.item.PublishedParsed == nil {
+	if item.PublishedParsed == nil {
 		return errMissingField("PublishedParsed")
 	}
-	if item.item.Link == "" {
+	if item.Link == "" {
 		return errMissingField("Link")
 	}
-	if item.item.Title == "" {
+	if item.Title == "" {
 		return errMissingField("Title")
 	}
 
 	// Filter out banned words
-	if has, which := containsAny(item.item.Description, config.BlockWords...); has {
+	if has, which := containsAny(item.Description, config.BlockWords...); has {
 		return errBlockWord("Description", which)
 	}
-	if has, which := containsAny(item.item.Title, config.BlockWords...); has {
+	if has, which := containsAny(item.Title, config.BlockWords...); has {
 		return errBlockWord("Title", which)
 	}
-	if has, which := containsAny(item.item.Content, config.BlockWords...); has {
+	if has, which := containsAny(item.Content, config.BlockWords...); has {
 		return errBlockWord("Content", which)
 	}
 
 	// Blocked posts by title, GUID, or link
-	if slices.Contains(config.BlockPosts, item.item.GUID) {
-		return errBlockPost("GUID", item.item.Title)
+	if slices.Contains(config.BlockPosts, item.GUID) {
+		return errBlockPost("GUID", item.Title)
 	}
-	if slices.Contains(config.BlockPosts, item.item.Title) {
-		return errBlockPost("Title", item.item.Title)
+	if slices.Contains(config.BlockPosts, item.Title) {
+		return errBlockPost("Title", item.Title)
 	}
-	if slices.Contains(config.BlockPosts, item.item.Link) {
-		return errBlockPost("Link", item.item.Title)
+	if slices.Contains(config.BlockPosts, item.Link) {
+		return errBlockPost("Link", item.Title)
 	}
 
 	// Blocked domains
-	if isBlocked, which := isBlockedDomain(item.item.Link, config); isBlocked {
+	if isBlocked, which := isBlockedDomain(item.Link, config); isBlocked {
 		return errors.New(fmt.Sprintf("Domain is blocked: %s", which))
 	}
 	return nil
 }
 
-func processPost(item *MultiTypeItem, feed *gofeed.Feed, config Config) (PostFrontmatter, error) {
+func processPost(item *gofeed.Item, feed *gofeed.Feed, config Config) (PostFrontmatter, error) {
 	out := PostFrontmatter{}
 	out.Params.Feed = *feed
 	out.Params.Feed.Items = []*gofeed.Item{} // exclude the others posts
-	out.Params.Post = *item.item
+	out.Params.Post = *item
 
 	postDate := unixEpoc()
-	if item.item.PublishedParsed != nil {
-		postDate = *item.item.PublishedParsed
+	if item.PublishedParsed != nil {
+		postDate = *item.PublishedParsed
 	}
 	out.Date = postDate.Format(time.RFC3339)
 	age := time.Since(postDate)
@@ -83,12 +83,12 @@ func processPost(item *MultiTypeItem, feed *gofeed.Feed, config Config) (PostFro
 	}
 
 	// An RSS only field (not Atom or JSON feeds)
-	if item.rss != nil {
-		out.Params.CommentsLink = item.rss.Comments
+	if value, has := item.Custom[RSS_CUSTOM_COMMENT_KEY]; has {
+		out.Params.CommentsLink = value
 	}
 
 	// Reduce the size, we won't render it all anyway
-	out.Title = truncateText(readable(item.item.Title), 200)
+	out.Title = truncateText(readable(item.Title), 200)
 	out.Params.Post.Description = truncateText(out.Params.Post.Description, 1024)
 	out.Params.Post.Content = truncateText(out.Params.Post.Content, 1024)
 
@@ -96,8 +96,7 @@ func processPost(item *MultiTypeItem, feed *gofeed.Feed, config Config) (PostFro
 }
 
 func processFeed(feedId string, feedDetails FeedDetails, config Config) ([]PostFrontmatter, *FeedFrontmatter, []PendingDiscover) {
-	fp := NewParser()
-	parsedFeed, mergedItems, err := fp.ParseURLExtended(feedDetails.Link)
+	parsedFeed, err := parseFeedFromUrl(feedDetails.Link)
 	if err != nil {
 		fmt.Printf("Unable to parse feed: %v %v", feedDetails, err)
 		return nil, nil, nil
@@ -121,8 +120,8 @@ func processFeed(feedId string, feedDetails FeedDetails, config Config) ([]PostF
 	following.Params.Feed.Items = []*gofeed.Item{}
 
 	reading := []PostFrontmatter{}
-	for _, post := range mergedItems {
-		processed, err := processPost(&post, parsedFeed, config)
+	for _, post := range parsedFeed.Items {
+		processed, err := processPost(post, parsedFeed, config)
 		processed.Params.FeedId = feedId
 		if err != nil {
 			fmt.Printf("  Excluding post: %v\n", err)
@@ -162,7 +161,7 @@ func main() {
 		reading = sortAndLimitPosts(reading, config.MaxPostsPerFeed)
 		fmt.Printf("  got %d more items for reading list\n", len(reading))
 		allReading = append(allReading, reading...)
-		fmt.Printf("  discovered %d more feeds\n", len(discover))
+		fmt.Printf("  discovered %d more recommendation lists\n", len(discover))
 		allBlogrollURLs = append(allBlogrollURLs, discover...)
 	}
 	allReading = sortAndLimitPosts(allReading, config.MaxPosts)

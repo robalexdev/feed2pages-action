@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head>
+    <title>Your Feeds</title>
+  </head>
+  <body>
+    <!-- Blogroll using source:blogroll in RSS -->
+    <outline text="alexsci.com blog" type="rss" xmlUrl="https://alexsci.com/blog/rss.xml" />
+
+    <!-- Blogroll using link rel=blogroll on homepage -->
+    <outline text="" type="rss" xmlUrl="https://www.manton.org/feed.xml" />
+
+    <!-- Blogroll using .well-known/recommendations.opml -->
+    <outline text="lmika" type="rss" xmlUrl="https://lmika.org/feed.xml" />
+
+    <!-- RSS with comments -->
+    <outline text="hn" type="rss" xmlUrl="https://hnrss.org/frontpage" />
+  </body>
+</opml>

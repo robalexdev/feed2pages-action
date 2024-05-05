@@ -1,0 +1,36 @@
+Feeds that offer recommendations
+
+These can be discovered by search engine:
+
+  https://www.google.com/search?q=".well-known%2Frecommendations.opml"
+
+
+Methods ordered by discovery preference.
+
+
+Using source:blogroll in RSS (most preferred):
+
+  https://alexsci.com/blog/rss.xml
+  http://scripting.com/rss.xml
+
+
+Using link rel=blogroll on homepage:
+
+  https://www.manton.org/feed.xml
+  https://technovia.co.uk/feed.xml
+  https://joeross.me/feed.xml
+
+
+Using recommendations.opml:
+
+  https://philbowell.me/feed.xml
+  https://samdavies.me/feed.xml
+  https://discursive.adamprocter.co.uk/feed.xml
+  https://lmika.org/feed.xml
+  https://therealadam.com/feed.xml
+
+
+Using recommendations.json:
+
+  None?
+

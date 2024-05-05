@@ -48,7 +48,17 @@ Software that blogroll discovery can help readers of your blog discover what you
 
 A core feature of Feed2Pages is RSS feed recommendation discovery.
 
+Various blogging engines support publishing a blogroll in a discoverable format.
+These include:
+
+* [Micro.blog](https://www.manton.org/2024/03/11/recommendations-and-blogrolls.html)
+* [Ghost](https://ghost.org/docs/recommendations/)
+
+These recommendations are the foundation of an RSS-based social network.
+Feed2Pages walks this social network to aid discovery of connected websites.
+
 For each feed in your OPML file, Feed2Pages will check for a `<source:blogroll>` element in the linked RSS feed.
+The `.well-known/recommendations.opml` path of the website linked in the feed is also checked.
 When one exists Feed2Pages will collect the information about each linked feed.
 This process can continue iteratively to collect not only the recommended feeds of the feeds you follow, but the recommendations of those feeds as well.
 

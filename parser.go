@@ -1,114 +1,44 @@
 package main
 
 import (
-	"bytes"
+	"fmt"
 	"github.com/mmcdole/gofeed"
-	"github.com/mmcdole/gofeed/atom"
-	"github.com/mmcdole/gofeed/json"
 	"github.com/mmcdole/gofeed/rss"
-	"io"
 )
 
-type CustomParser struct {
-	*gofeed.Parser
-	ap             *atom.Parser
-	jp             *json.Parser
-	rp             *rss.Parser
-	atomTranslator *gofeed.DefaultAtomTranslator
-	jsonTranslator *gofeed.DefaultJSONTranslator
-	rssTranslator  *gofeed.DefaultRSSTranslator
+type CommentsTranslator struct {
+	defaultTranslator *gofeed.DefaultRSSTranslator
 }
 
-func identifyFeed(feed io.Reader) (gofeed.FeedType, io.Reader) {
-	// Wrap the feed io.Reader in a io.TeeReader
-	// so we can capture all the bytes read by the
-	// DetectFeedType function and construct a new
-	// reader with those bytes intact for when we
-	// attempt to parse the feeds.
-	var buf bytes.Buffer
-	tee := io.TeeReader(feed, &buf)
-	feedType := gofeed.DetectFeedType(tee)
-
-	// Glue the read bytes from the detect function
-	// back into a new reader
-	r := io.MultiReader(&buf, feed)
-	return feedType, r
+func NewCommentsTranslator() *CommentsTranslator {
+	t := &CommentsTranslator{}
+	t.defaultTranslator = &gofeed.DefaultRSSTranslator{}
+	return t
 }
 
-func mergeFeeds(feed *gofeed.Feed, rss *rss.Feed) []MultiTypeItem {
-	out := []MultiTypeItem{}
-	for _, item := range feed.Items {
-		converted := MultiTypeItem{}
-		converted.item = item
-		if rss != nil {
-			for _, rssItem := range rss.Items {
-				if rssItem.GUID != nil {
-					if item.GUID == rssItem.GUID.Value {
-						converted.rss = rssItem
-					}
-				} else if item.Link == rssItem.Link {
-					converted.rss = rssItem
+func (ct *CommentsTranslator) Translate(feed interface{}) (*gofeed.Feed, error) {
+	rss, found := feed.(*rss.Feed)
+	if !found {
+		return nil, fmt.Errorf("Feed did not match expected type of *rss.Feed")
+	}
+
+	f, err := ct.defaultTranslator.Translate(rss)
+	if err != nil {
+		return nil, err
+	}
+
+	// Collect comments
+	for _, item := range f.Items {
+		for _, r := range rss.Items {
+			if item.GUID == r.GUID.Value {
+				if item.Custom == nil {
+					item.Custom = map[string]string{}
 				}
+				item.Custom[RSS_CUSTOM_COMMENT_KEY] = r.Comments
+				break
 			}
 		}
-		out = append(out, converted)
-	}
-	return out
-}
-
-func (f *CustomParser) Parse(feed io.Reader) (*gofeed.Feed, []MultiTypeItem, error) {
-	var err error
-	var rssFeed *rss.Feed = nil
-	var parsedFeed *gofeed.Feed
-
-	feedType, r := identifyFeed(feed)
-
-	switch feedType {
-	case gofeed.FeedTypeAtom:
-		parsed, err := f.ap.Parse(r)
-		if err != nil {
-			return nil, nil, err
-		}
-		parsedFeed, err = f.atomTranslator.Translate(parsed)
-
-	case gofeed.FeedTypeJSON:
-		parsed, err := f.jp.Parse(r)
-		if err != nil {
-			return nil, nil, err
-		}
-		parsedFeed, err = f.jsonTranslator.Translate(parsed)
-
-	case gofeed.FeedTypeRSS:
-		rssFeed, err = f.rp.Parse(r)
-		if err != nil {
-			return nil, nil, err
-		}
-		parsedFeed, err = f.rssTranslator.Translate(rssFeed)
-
-	default:
-		return nil, nil, gofeed.ErrFeedTypeNotDetected
 	}
 
-	posts := mergeFeeds(parsedFeed, rssFeed)
-	return parsedFeed, posts, nil
-}
-
-func (f *CustomParser) ParseURLExtended(url string) (*gofeed.Feed, []MultiTypeItem, error) {
-	resp, err := httpGet(url)
-	if err != nil {
-		return nil, nil, err
-	}
-	defer resp.Close()
-	return f.Parse(resp)
-}
-
-func NewParser() *CustomParser {
-	return &CustomParser{
-		ap:             &atom.Parser{},
-		atomTranslator: &gofeed.DefaultAtomTranslator{},
-		jp:             &json.Parser{},
-		jsonTranslator: &gofeed.DefaultJSONTranslator{},
-		rp:             &rss.Parser{},
-		rssTranslator:  &gofeed.DefaultRSSTranslator{},
-	}
+	return f, nil
 }
