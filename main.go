@@ -43,10 +43,8 @@ func filterPost(item *MultiTypeItem, config Config) error {
 	}
 
 	// Blocked domains
-	for _, blockedDomain := range config.BlockDomains {
-		if isDomainOrSubdomain(item.item.Link, blockedDomain) {
-			return errors.New(fmt.Sprintf("Domain is blocked: %s", blockedDomain))
-		}
+	if isBlocked, which := isBlockedDomain(item.item.Link, config); isBlocked {
+		return errors.New(fmt.Sprintf("Domain is blocked: %s", which))
 	}
 	return nil
 }
@@ -97,37 +95,32 @@ func processPost(item *MultiTypeItem, feed *gofeed.Feed, config Config) (PostFro
 	return out, nil
 }
 
-func processFeed(feedId string, feedDetails FeedDetails, config Config) ([]PostFrontmatter, FeedFrontmatter) {
+func processFeed(feedId string, feedDetails FeedDetails, config Config) ([]PostFrontmatter, *FeedFrontmatter, []PendingDiscover) {
 	fp := NewParser()
 	parsedFeed, mergedItems, err := fp.ParseURLExtended(feedDetails.Link)
 	if err != nil {
 		fmt.Printf("Unable to parse feed: %v %v", feedDetails, err)
-		return []PostFrontmatter{}, FeedFrontmatter{}
+		return nil, nil, nil
 	}
 
-	feed := FeedFrontmatter{}
-	feed.Title = parsedFeed.Title
-	feed.Description = parsedFeed.Description
-	feed.Params.Feed = *parsedFeed
-	feed.Params.Id = feedId
+	following := FeedFrontmatter{}
+	following.Title = parsedFeed.Title
+	following.Description = parsedFeed.Description
+	following.Params.Feed = *parsedFeed
+	following.Params.Id = feedId
 
-	if isEmpty(feed.Title) {
-		feed.Title = feedDetails.Title
+	if isEmpty(following.Title) {
+		following.Title = feedDetails.Title
 	}
-	if isEmpty(feed.Description) {
-		feed.Description = feedDetails.Text
+	if isEmpty(following.Description) {
+		following.Description = feedDetails.Text
 	}
+	following.Date = bestFeedDate(parsedFeed)
 
 	// Store posts elsewhere
-	feed.Params.Feed.Items = []*gofeed.Item{}
+	following.Params.Feed.Items = []*gofeed.Item{}
 
-	if parsedFeed.PublishedParsed != nil {
-		feed.Date = parsedFeed.PublishedParsed.Format(time.RFC3339)
-	} else if parsedFeed.UpdatedParsed != nil {
-		feed.Date = parsedFeed.UpdatedParsed.Format(time.RFC3339)
-	}
-
-	posts := []PostFrontmatter{}
+	reading := []PostFrontmatter{}
 	for _, post := range mergedItems {
 		processed, err := processPost(&post, parsedFeed, config)
 		processed.Params.FeedId = feedId
@@ -135,40 +128,57 @@ func processFeed(feedId string, feedDetails FeedDetails, config Config) ([]PostF
 			fmt.Printf("  Excluding post: %v\n", err)
 			continue
 		}
-		posts = append(posts, processed)
+		reading = append(reading, processed)
 	}
-	return posts, feed
+
+	// Parse blogroll
+	discoverUrls := processBlogroll(parsedFeed)
+	return reading, &following, discoverUrls
 }
 
 func main() {
 	config := parseConfig()
 
-	postOutputPath := contentPath(firstNonEmpty(config.PostFolderName, DEFAULT_POST_FOLDER))
-	feedOutputPath := contentPath(firstNonEmpty(config.FeedFolderName, DEFAULT_FEED_FOLDER))
-	mkdirIfNotExists(postOutputPath)
-	mkdirIfNotExists(feedOutputPath)
-	rmGenerated(postOutputPath)
-	rmGenerated(feedOutputPath)
+	readingOutputPath := contentPath(firstNonEmpty(config.ReadingFolderName, DEFAULT_READING_FOLDER))
+	followingOutputPath := contentPath(firstNonEmpty(config.FollowingFolderName, DEFAULT_FOLLOWING_FOLDER))
+	discoverOutputPath := contentPath(firstNonEmpty(config.DiscoverFolderName, DEFAULT_DISCOVER_FOLDER))
+	mkdirIfNotExists(readingOutputPath)
+	mkdirIfNotExists(followingOutputPath)
+	mkdirIfNotExists(discoverOutputPath)
+	rmGenerated(READING_PREFIX, readingOutputPath)
+	rmGenerated(FOLLOWING_PREFIX, followingOutputPath)
+	rmGenerated(DISCOVER_PREFIX, discoverOutputPath)
 
-	allPosts := []PostFrontmatter{}
-	allFeeds := []FeedFrontmatter{}
+	allReading := []PostFrontmatter{}
+	allFollowing := []FeedFrontmatter{}
+	allBlogrollURLs := []PendingDiscover{}
 	for id, feedDetails := range config.Feeds {
 		fmt.Printf("Processing feed: %v\n", feedDetails)
 		feedId := fmt.Sprintf("%d", id)
-		posts, feed := processFeed(feedId, feedDetails, config)
-		allFeeds = append(allFeeds, feed)
-		posts = sortAndLimitPosts(posts, *config.MaxPostsPerFeed)
-		fmt.Printf("  got %d posts\n", len(posts))
-		allPosts = append(allPosts, posts...)
+		reading, following, discover := processFeed(feedId, feedDetails, config)
+		if following != nil {
+			allFollowing = append(allFollowing, *following)
+		}
+		reading = sortAndLimitPosts(reading, config.MaxPostsPerFeed)
+		fmt.Printf("  got %d more items for reading list\n", len(reading))
+		allReading = append(allReading, reading...)
+		fmt.Printf("  discovered %d more feeds\n", len(discover))
+		allBlogrollURLs = append(allBlogrollURLs, discover...)
 	}
-	allPosts = sortAndLimitPosts(allPosts, *config.MaxPosts)
-	fmt.Printf("Total %d posts\n", len(allPosts))
-	for _, feed := range allFeeds {
-		path := generatedFilePath(feedOutputPath, feed.Params.Id)
-		writeYaml(feed, path)
+	allReading = sortAndLimitPosts(allReading, config.MaxPosts)
+	fmt.Printf("Items in reading list: %d\n", len(allReading))
+	for _, following := range allFollowing {
+		path := generatedFilePath(followingOutputPath, FOLLOWING_PREFIX, following.Params.Id)
+		writeYaml(following, path)
 	}
-	for _, post := range allPosts {
-		path := generatedFilePath(postOutputPath, safeGUID(post))
-		writeYaml(post, path)
+	for _, reading := range allReading {
+		path := generatedFilePath(readingOutputPath, READING_PREFIX, safeGUID(reading))
+		writeYaml(reading, path)
+	}
+
+	allBlogrolls := discoverMoreFeeds(allBlogrollURLs, config)
+	for id, discover := range allBlogrolls {
+		path := generatedFilePath(discoverOutputPath, DISCOVER_PREFIX, fmt.Sprintf("%d", id))
+		writeYaml(discover, path)
 	}
 }

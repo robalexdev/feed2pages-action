@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/xml"
 	"fmt"
+	"golang.org/x/net/html/charset"
 )
 
 type XmlOpml struct {
@@ -43,18 +44,19 @@ func asDetails(outlines []XmlOutline) []FeedDetails {
 	return result
 }
 
-func parseOpml(url string) []FeedDetails {
+func parseOpml(url string) ([]FeedDetails, error) {
 	content, closer, err := readUrl(url)
 	if err != nil {
-		panicf("Error reading URL: %s: %e", url, err)
+		return nil, errStrings(err, "Unable to read URL", url)
 	}
 	defer closer.Close()
 	decoder := xml.NewDecoder(content)
+	decoder.CharsetReader = charset.NewReaderLabel
 	opml := XmlOpml{}
 	err = decoder.Decode(&opml)
 	if err != nil {
-		panicf("Error decoding OMPL: %e", err)
+		return nil, errStrings(err, "Unable to decode XML", url)
 	}
 	fmt.Printf("OPML parsed as: %v\n", opml)
-	return asDetails(opml.Body.Outline)
+	return asDetails(opml.Body.Outline), nil
 }

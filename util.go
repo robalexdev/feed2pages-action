@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/go-yaml/yaml"
+	"github.com/mmcdole/gofeed"
 	"os"
 	"path/filepath"
 	"sort"
@@ -40,13 +41,13 @@ func mkdirIfNotExists(path string) {
 	}
 }
 
-func rmGenerated(path string) {
+func rmGenerated(prefix, path string) {
 	files, err := os.ReadDir(path)
 	if err != nil {
 		panicf("Unable to read directory: %s: %e", path, err)
 	}
 	for _, f := range files {
-		if strings.HasPrefix(f.Name(), GENERATED_FILE_PREFIX) {
+		if strings.HasPrefix(f.Name(), prefix) {
 			os.Remove(filepath.Join(path, f.Name()))
 		}
 	}
@@ -107,7 +108,10 @@ func parseConfig() Config {
 		panicf("Config decode error: %e", err)
 	}
 	// Parse the OPML file (local file or remote resource)
-	config.Feeds = parseOpml(config.FeedUrl)
+	config.Feeds, err = parseOpml(config.FeedUrl)
+	if err != nil {
+		panicf("Unable to parse OPML: %e", err)
+	}
 	return config
 }
 
@@ -121,17 +125,20 @@ func safeGUID(post PostFrontmatter) string {
 	return strings.Replace(s, "=", "", -1)
 }
 
-func sortAndLimitPosts(posts []PostFrontmatter, limit int) []PostFrontmatter {
+func sortAndLimitPosts(posts []PostFrontmatter, limit *int) []PostFrontmatter {
 	sort.Slice(
 		posts,
 		func(i, j int) bool {
 			return posts[i].Date > posts[j].Date
 		},
 	)
-	if limit > len(posts) {
-		return posts
+	if limit != nil {
+		if *limit > len(posts) {
+			return posts
+		}
+		return posts[:*limit]
 	}
-	return posts[:limit]
+	return posts
 }
 
 func truncateText(s string, max int) string {
@@ -143,6 +150,14 @@ func truncateText(s string, max int) string {
 
 func panicf(f string, a ...any) {
 	panic(fmt.Sprintf(f, a...))
+}
+
+func errStrings(err error, s ...string) error {
+	all := ""
+	for _, next := range s {
+		all = all + " " + next
+	}
+	return errors.New(fmt.Sprintf("%s: %e", all, err))
 }
 
 func errMissingField(field string) error {
@@ -165,7 +180,174 @@ func contentPath(folder string) string {
 	return filepath.Join("content", folder)
 }
 
-func generatedFilePath(basePath, id string) string {
-	name := fmt.Sprintf("%s%s.md", GENERATED_FILE_PREFIX, id)
+func generatedFilePath(basePath, prefix, id string) string {
+	name := fmt.Sprintf("%s%s.md", prefix, id)
 	return filepath.Join(basePath, name)
+}
+
+func bestFeedDate(feed *gofeed.Feed) string {
+	if feed.UpdatedParsed != nil {
+		return feed.UpdatedParsed.Format(time.RFC3339)
+	} else if feed.PublishedParsed != nil {
+		return feed.PublishedParsed.Format(time.RFC3339)
+	}
+	return ""
+}
+
+func processBlogroll(feed *gofeed.Feed) []PendingDiscover {
+	discoverUrls := []PendingDiscover{}
+	if sourceNS, has := feed.Extensions["source"]; has {
+		if blogrolls, has := sourceNS["blogroll"]; has {
+			for _, blogroll := range blogrolls {
+				discovered := PendingDiscover{}
+				discovered.RecommendedBy = feed.Link
+				discovered.Link = blogroll.Value
+				discoverUrls = append(discoverUrls, discovered)
+			}
+		}
+	}
+	return discoverUrls
+}
+
+func sortDedupePendingDiscover(in []PendingDiscover) []PendingDiscover {
+	sort.Slice(in, func(i, j int) bool {
+		return in[i].Link < in[j].Link
+	})
+	last := PendingDiscover{}
+	out := []PendingDiscover{}
+	for _, check := range in {
+		if check.Link != last.Link {
+			out = append(out, check)
+			last = check
+		}
+	}
+	return out
+}
+
+func sortAndDedupeFeedDetails(in []FeedDetails) []FeedDetails {
+	sort.Slice(in, func(i, j int) bool {
+		return in[i].Link < in[j].Link
+	})
+	last := FeedDetails{}
+	out := []FeedDetails{}
+	for _, check := range in {
+		if check.Link != last.Link {
+			out = append(out, check)
+			last = check
+		}
+	}
+	return out
+}
+
+func discoverMoreFeeds(opmlUrls []PendingDiscover, config Config) []DiscoverFrontmatter {
+	if config.DiscoverDepth == nil {
+		fmt.Println("Skipping discovery, discover_depth is not set")
+		return nil
+	} else if *config.DiscoverDepth < 1 {
+		fmt.Println("Skipping discovery, discover_depth is < 1")
+		return nil
+	}
+	fp := NewParser()
+	id := -1
+	remainingDepth := *config.DiscoverDepth
+	remainingRecs := 1000
+	if config.MaxRecommendations != nil {
+		remainingRecs = *config.MaxRecommendations
+	}
+	collected := map[string]DiscoverFrontmatter{}
+	processed := map[string]bool{}
+	for len(opmlUrls) > 0 && remainingDepth > 0 && remainingRecs > 0 {
+		remainingDepth -= 1
+
+		nextOpmlUrls := []PendingDiscover{}
+		opmlUrls = sortDedupePendingDiscover(opmlUrls)
+
+		for _, opmlInfo := range opmlUrls {
+			remainingRecsForFeed := 100
+			if config.MaxRecommendationsPerFeed != nil {
+				remainingRecsForFeed = *config.MaxRecommendationsPerFeed
+			}
+
+			if _, has := processed[opmlInfo.Link]; has {
+				// Already processed OPML URL
+				continue
+			} else {
+				processed[opmlInfo.Link] = true
+			}
+
+			fmt.Printf("Discovering via: %v\n", opmlInfo)
+			feedDetails, err := parseOpml(opmlInfo.Link)
+			if err != nil {
+				fmt.Printf("Unable to process OPML: %s: %e\n", opmlInfo.Link, err)
+				continue
+			}
+
+			feedDetails = sortAndDedupeFeedDetails(feedDetails)
+
+			for _, feedDetail := range feedDetails {
+				fmt.Printf("Discovered: %s\n", feedDetail.Link)
+				if found, has := collected[feedDetail.Link]; has {
+					// Already processed link
+					// Track a new recommender
+					found.Params.RecommendedBy = append(found.Params.RecommendedBy, opmlInfo.RecommendedBy)
+				} else {
+					if isBlocked, _ := isBlockedDomain(feedDetail.Link, config); isBlocked {
+						fmt.Printf("Blocked feed: %s\n", feedDetail.Link)
+						continue
+					}
+
+					feed, _, err := fp.ParseURLExtended(feedDetail.Link)
+					if err != nil {
+						fmt.Printf("Skipping feed: %s: %e\n", feedDetail.Link, err)
+						// TODO add to collected somehow
+						continue
+					}
+
+					newFeed := DiscoverFrontmatter{}
+					newFeed.Params.Id = fmt.Sprintf("disc-%d", id)
+					id += 1
+					newFeed.Title = feed.Title
+					newFeed.Description = feed.Description
+					newFeed.Date = bestFeedDate(feed)
+					newFeed.Params.Link = feed.Link
+					if newFeed.Params.Link == "" {
+						newFeed.Params.Link = feedDetail.Link
+					}
+					newFeed.Params.RecommendedBy = []string{opmlInfo.RecommendedBy}
+
+					collected[feed.Link] = newFeed
+					moreOpmlUrls := processBlogroll(feed)
+					nextOpmlUrls = append(nextOpmlUrls, moreOpmlUrls...)
+
+					remainingRecs -= 1
+					if remainingRecs <= 0 {
+						fmt.Println("Reached recommendation limit")
+						break
+					}
+					remainingRecsForFeed -= 1
+					if remainingRecsForFeed <= 0 {
+						fmt.Println("Reached recommendation limit for feed")
+						break
+					}
+				}
+			}
+		}
+		// Process the next round of feeds
+		opmlUrls = nextOpmlUrls
+	}
+
+	out := make([]DiscoverFrontmatter, 0, len(collected))
+	for _, value := range collected {
+		out = append(out, value)
+	}
+	return out
+}
+
+func isBlockedDomain(url string, config Config) (bool, string) {
+	for _, blockedDomain := range config.BlockDomains {
+		if isDomainOrSubdomain(url, blockedDomain) {
+			return true, blockedDomain
+		}
+	}
+	return false, ""
 }

@@ -1,6 +1,6 @@
 # Feed2Pages
 
-A blogroll that aggregates RSS feeds into your own news feed web site.
+A blogroll generator for [Hugo](https://gohugo.io/)-based websites that aggregates RSS feeds into your own news feed website.
 
 
 ## Use cases
@@ -13,58 +13,62 @@ A blogroll that aggregates RSS feeds into your own news feed web site.
 
 ## Build your own
 
-First fork this repository into your GitHub account.
-Then enable GitHub Pages:
+Please check out these example repos for help getting started:
 
-![Steps to enable GitHub Pages](/images/Enable Pages.png).
-
-1. Open the Settings tab on your repo
-2. Select Pages from the lefthand navigation
-3. Set the source to GitHub Actions
-
-You can configure a custom domain or enforce HTTPS on this page as well.
+* [feed2pages-example](https://github.com/ralexander-phi/feed2pages-demo) - A generic quick start example
+* [feed2pages-paper](https://github.com/ralexander-phi/feed2Pages-paper) - A Hugo PaperMod example
+* [author's feeds](https://github.com/ralexander-phi/feeds) - The feeds for this project's author
 
 
-## Connect your feeds
+## Development
 
-If you're already using an RSS feed reader, check if it can export an OPML file.
-Export this and save it as `site/static/links.opml`.
-You'll need to re-export this file to pick up any changes to who you follow.
+Build the utility:
 
-You can manage your feed on sites like [FeedLand](https://feedland.com), which publishes your subscriptions at `https://feedland.com/opml?screenname=<yourname>`.
-Edit `site/feeds.yaml` and set `feed_url` to the URL of your OPML file.
-
-Alternatively, you can edit the provided sample file (`site/static/links.opml`) manually.
-The most important field is `xmlUrl` (which points to the feed URL).
-
-
-## Running locally
-
-First build the utility:
-
-    $ cd util
     $ go build
 
-Then run hugo:
+In a directory with a feed.yaml file, run the utility:
 
-    $ hugo server
+    $ ./util
 
 
-## Promote your links
+## How to promote your favorite feeds
 
-Add `<link rel="alternate" type="application/opml+xml" href="<your site>/links.opml">`
-Software that supports this syntax can help readers of your blog discover what you're reading.
+Export an OPML from your feed reader.
+Upload your OPML export as `https://<your-site>/.well-known/recommendations.opml` (or another location).
+On each page of your website (or at least your home page) link to your OPML file using: `<link rel="blogroll" type="text/xml" href="https://<your-site>/.well-known/recommendations.opml">`.
+Finally, edit your RSS feed to add the `<source:blogroll>` element.
+See [blogroll.opml](https://opml.org/blogroll.opml) for more info.
+
+For web-based readers, like [FeedLand](https://feedland.com), find a URL for your OPML file and link to that instead of uploading.
+
+Software that blogroll discovery can help readers of your blog discover what you're reading.
+
+
+## Discovering recommended feeds
+
+A core feature of Feed2Pages is RSS feed recommendation discovery.
+
+For each feed in your OPML file, Feed2Pages will check for a `<source:blogroll>` element in the linked RSS feed.
+When one exists Feed2Pages will collect the information about each linked feed.
+This process can continue iteratively to collect not only the recommended feeds of the feeds you follow, but the recommendations of those feeds as well.
 
 
 ## feeds.yaml settings
 
-`opml`: The URL of your RSS OPML file. You likely don't need to change this, but you can set this to a remote file if you already publish this file elsewhere. There's many public OPML files, like [Awesome RSS Feeds](https://github.com/plenaryapp/awesome-rss-feeds), for example.
+`feed_url`: The URL of your RSS OPML file.
+
+If you're serving your OPML file with Hugo, set this to `file://static/.well-known/recommendations.opml`.
+
+If you are using a site like [FeedLand](https://feedland.com), your subscriptions are available at `https://feedland.com/opml?screenname=<yourname>`.
+
+
+### Post filters and limits
 
 `post_age_limit_days`: Filter out posts older than this limit
 
 `max_posts_per_feed`: Include only the newest N posts from each feed. This helps when some feeds publish content much more frequently than others, as they could otherwise fill the news feed.
 
-`max_posts`: Limit the number of posts to display.
+`max_posts`: Limit the number of posts to display. Used for performance reasons.
 
 `block_words`: Articles that contain any of these words in the title, description, or page content will be filtered out.
 
@@ -72,28 +76,36 @@ Software that supports this syntax can help readers of your blog discover what y
 
 `block_posts`: Individual posts that match these titles, GUIDs, or link URLs will be filtered out.
 
-`post_folder_name`: Change this if you'd like posts to go in a different folder. Default: reading
 
-`feed_folder_name`: Change this if you'd like feeds to go in a different folder. Default: following
+### Recommended feed discovery
+
+`discover_depth`: How many iterations to perform when discovering recommended feeds. (default: 1. I.E. just the recommendations of the feeds you directly follow).
+
+Set to zero to disable feed discovery.
+
+`max_recommendations_per_feed`: How many recommendations to process per feed. (default: 100).
+
+`max_recommendations`: How many recommendations to process in total (default: 1000).
+
+
+### Configure output
+
+`reading_folder_name`: Which content folder to store discovered posts. Default: reading
+
+`following_folder_name`: Which content folder to store your followed feeds. Default: following
+
+`discover_folder_name`: Which content folder to store feeds recommended by feeds you follow. Default: discover
+
+
 
 ## How it works
 
-1. The repository owner configures the RSS feeds they wish to follow
-2. They configure settings such as block words to curate the news feed
-3. GitHub Actions runs as a periodic (daily) cron job
-4. The scraping utility collects articles from RSS feeds
-5. The feed contents are normalized and enriched
-6. The discovered articles are saved as [Hugo](https://gohugo.io/) pages
-7. Hugo builds the site into static HTML
-8. GitHub Actions publishes the HTML to GitHub Pages
-
-
-## Ideas
-
-* Collect articles from popular news website and aggregator RSS feeds, using filters to create a single topic news feed.
-  * Hacker News: https://news.ycombinator.com/rss
-  * Hacker News RSS: https://hnrss.org
-  * Reddit Subreddits: https://www.reddit.com/r/programming.rss
-  * Lobsters: https://lobste.rs/t/programming,compsci.rss
-  * NY Times: https://rss.nytimes.com/services/xml/rss/nyt/World.xml
-  * Many more: https://github.com/plenaryapp/awesome-rss-feeds/blob/master/README.md
+1. The repository owner configures the RSS feeds they wish to follow in `feeds.yaml`.
+2. They configure settings such as block words to curate their news feed
+3. GitHub Actions runs as a periodic (daily) cron job:
+    1. The scraping utility collects articles from the RSS feeds
+    2. The feed contents are normalized and enriched
+    3. The discovered feeds and posts are saved as Hugo content
+    4. Recommended feeds are discovered iteratively
+    5. Hugo builds the site into static HTML
+    6. GitHub Actions publishes the HTML to GitHub Pages
