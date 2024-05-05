@@ -30,7 +30,7 @@ func (ct *CommentsTranslator) Translate(feed interface{}) (*gofeed.Feed, error) 
 	// Collect comments
 	for _, item := range f.Items {
 		for _, r := range rss.Items {
-			if item.GUID == r.GUID.Value {
+			if r.GUID != nil && item.GUID == r.GUID.Value {
 				if item.Custom == nil {
 					item.Custom = map[string]string{}
 				}
