@@ -1,26 +1,2 @@
-# If you host your own you can load it here
-# I.E.: feed_url: https://feedland.com/opml?screenname=robalexdev
-feed_url: file://test.opml
-
-post_age_limit_days:
-max_posts_per_feed: 5
-max_posts: 20
-
-block_words:
-  - cryptocurrency
-  - bitcoin
-  - tesla
-
-block_domains:
-  - medium.com
-  - substack.com
-  - twitter.com
-  - youtube.com
-  - youtu.be
-
-    # slow source
-  - feedpress.me
-
-discover_depth: 4
-max_recommendations_per_feed: 3
-max_recommendations: 50
+feed_url: http://localhost:8000/initial.opml
+discover_depth: 100

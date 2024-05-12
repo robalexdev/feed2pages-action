@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:source="http://source.scripting.com/">
+<channel>
+  <title>testing</title>
+  <link>http://localhost:8000/</link>
+  <description>Test RSS Feed</description>
+
+  <source:blogroll>http://localhost:8000/b.opml</source:blogroll>
+
+  <item>
+    <title>Post B 1</title>
+    <link>http://localhost:8000/post-b-1</link>
+    <guid isPermaLink="false">b-1</guid>
+  </item>
+
+  <item>
+    <title>Post B 2</title>
+    <link>http://localhost:8000/post-b-2</link>
+    <guid isPermaLink="false">b-2</guid>
+  </item>
+</channel>
+</rss> 

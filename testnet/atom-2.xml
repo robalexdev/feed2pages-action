@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title>Example Atom Feed #2</title>
+  <link href="http://localhost:8000/atom-website-2"/>
+  <updated>2003-12-13T18:30:02Z</updated>
+  <id>urn:uuid:60a76c81-e399-11d9-b93C-0003939e0af6</id>
+
+  <entry>
+    <title>Example Atom Article F2-1</title>
+    <link href="http://localhost:8000/atom-article-f2a1"/>
+    <id>urn:uuid:1225c699-cfb8-4ebb-aaaa-80da344efb0a</id>
+    <updated>2003-12-13T18:30:02Z</updated>
+    <summary>this a summary</summary>
+  </entry>
+
+</feed>

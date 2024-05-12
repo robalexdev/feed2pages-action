@@ -1,14 +1,14 @@
 package main
 
+const USER_AGENT = "Feed2Pages/0.1"
+
 const DEFAULT_READING_FOLDER = "reading"
 const DEFAULT_FOLLOWING_FOLDER = "following"
 const DEFAULT_DISCOVER_FOLDER = "discover"
+const DEFAULT_NETWORK_FOLDER = "network"
 
-const READING_PREFIX = "post-"
-const FOLLOWING_PREFIX = "feed-"
-const DISCOVER_PREFIX = "feed-"
+const POST_PREFIX = "post-"
+const FEED_PREFIX = "feed-"
+const LINK_PREFIX = "link-"
 
 const WELL_KNOWN_RECOMMENDATIONS_OPML = "/.well-known/recommendations.opml"
-const WELL_KNOWN_RECOMMENDATIONS_JSON = "/.well-known/recommendations.json"
-
-const RSS_CUSTOM_COMMENT_KEY = "_feed2pages_comments"

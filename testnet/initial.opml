@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head></head>
+  <body>
+    <outline text="Feed-A" xmlUrl="http://localhost:8000/a.xml" />
+    <outline text="Atom-Feed-1" xmlUrl="http://localhost:8000/atom.xml" />
+  </body>
+</opml>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:source="http://source.scripting.com/">
+<channel>
+  <title>E testing</title>
+  <link>http://localhost:8000/</link>
+  <description>Test RSS Feed E</description>
+
+  <item>
+    <title>Post E 1</title>
+    <link>http://localhost:8000/post-e-1</link>
+    <guid isPermaLink="false">e-1</guid>
+  </item>
+</channel>
+</rss> 

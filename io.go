@@ -2,59 +2,13 @@ package main
 
 import (
 	"bufio"
-	"errors"
-	"fmt"
 	readability "github.com/go-shiori/go-readability"
 	"github.com/go-yaml/yaml"
 	"io"
-	"net/http"
 	"net/url"
 	"os"
 	"strings"
 )
-
-func httpGet(url string) (io.ReadCloser, error) {
-	client := http.Client{}
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", "Feed2Pages/1.0")
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	return resp.Body, nil
-}
-
-// Does HTTP HEAD request get a 200 OK?
-func httpHeadOk(url string) bool {
-	client := http.Client{}
-	req, err := http.NewRequest("HEAD", url, nil)
-	if err != nil {
-		return false
-	}
-	req.Header.Set("User-Agent", "Feed2Pages/1.0")
-	resp, err := client.Do(req)
-	if err != nil {
-		return false
-	}
-	return resp.StatusCode == 200
-}
-
-func readUrl(url string) (io.Reader, io.Closer, error) {
-	if strings.HasPrefix(url, "https://") || strings.HasPrefix(url, "http://") {
-		f, err := httpGet(url)
-		if err != nil {
-			return nil, nil, err
-		}
-		return bufio.NewReader(f), f, nil
-	} else if strings.HasPrefix(url, "file://") {
-		url := strings.Replace(url, "file://", "", 1)
-		return readFile(url)
-	}
-	return nil, nil, errors.New(fmt.Sprintf("Unsupported protocol: %s", url))
-}
 
 func readFile(path string) (io.Reader, io.Closer, error) {
 	f, err := os.Open(path)

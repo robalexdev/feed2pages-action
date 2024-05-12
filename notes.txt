@@ -12,6 +12,7 @@ Using source:blogroll in RSS (most preferred):
 
   https://alexsci.com/blog/rss.xml
   http://scripting.com/rss.xml
+  https://colinwalker.blog/feeds
 
 
 Using link rel=blogroll on homepage:

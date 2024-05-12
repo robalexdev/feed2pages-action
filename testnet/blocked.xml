@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:source="http://source.scripting.com/">
+<channel>
+  <title>BLOCKED</title>
+  <link>http://localhost:8000/</link>
+  <description>BLOCKED FEED</description>
+
+  <item>
+    <title>BLOCKED</title>
+    <link>http://localhost:8000/blocked</link>
+    <guid isPermaLink="false">blocked-1</guid>
+    <pubDate>Sun, 19 May 2002 15:21:36 GMT</pubDate>
+  </item>
+
+</channel>
+</rss> 

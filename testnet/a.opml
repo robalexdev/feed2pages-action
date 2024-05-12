@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head>
+    <title>Initial OPML file for test</title>
+  </head>
+  <body>
+    <outline text="Feed-B" xmlUrl="http://localhost:8000/b.xml" />
+    <outline text="Feed-C" xmlUrl="http://localhost:8000/c.xml" />
+    <outline text="Atom-Feed-2" xmlUrl="http://localhost:8000/atom-2.xml" />
+  </body>
+</opml>

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:source="http://source.scripting.com/">
+<channel>
+  <title>testing</title>
+  <link>http://localhost:8000/</link>
+  <description>Test RSS Feed</description>
+
+  <item>
+    <title>Post D 1</title>
+    <link>http://localhost:8000/post-d-1</link>
+    <guid isPermaLink="false">d-1</guid>
+  </item>
+
+  <item>
+    <title>Post D 2</title>
+    <link>http://localhost:8000/post-d-2</link>
+    <guid isPermaLink="false">d-2</guid>
+  </item>
+
+  <item>
+    <title>Post D 3</title>
+    <link>http://localhost:8000/post-d-3</link>
+    <guid isPermaLink="false">d-3</guid>
+  </item>
+</channel>
+</rss> 
