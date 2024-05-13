@@ -3,4 +3,4 @@ description: 'Collect content for a Hugo Blogroll'
 author: 'Robert Alexander (robalexdev.com)'
 runs:
   using: "docker"
-  image: "docker://ghcr.io/ralexander-phi/feed2pages-action:latest"
+  image: "Dockerfile"
