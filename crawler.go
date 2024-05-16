@@ -84,12 +84,14 @@ func (c *Crawler) OnXML_RssChannel(channel *colly.XMLElement) {
 	title := channel.ChildText("/title")
 	description := channel.ChildText("/description")
 	date := channel.ChildText("/pubDate")
+	blogrolls := channel.ChildTexts("/source:blogroll")
 
 	feed := NewFeedFrontmatter(feed_url)
 	feed.WithDate(date)
 	feed.WithTitle(title)
 	feed.WithDescription(description)
 	feed.WithLink(link)
+	feed.WithBlogRolls(blogrolls)
 
 	if blocked, domain := isBlockedDomain(link, c.Config); blocked {
 		log.Printf("Domain is blocked: %s", domain)
@@ -112,7 +114,6 @@ func (c *Crawler) OnXML_RssChannel(channel *colly.XMLElement) {
 	feed.Save(isDirect, c.Config)
 
 	// Check for blogrolls
-	blogrolls := channel.ChildTexts("/source:blogroll")
 	if len(blogrolls) != 0 {
 		for _, blogroll := range blogrolls {
 			log.Printf("Found blogroll: %s", blogroll)

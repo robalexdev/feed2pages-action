@@ -55,9 +55,10 @@ type FeedFrontmatter struct {
 }
 
 type FeedParams struct {
-	FeedLink string `yaml:"feedlink"`
-	Id       string `yaml:"id"`
-	Link     string `yaml:"link"`
+	FeedLink  string   `yaml:"feedlink"`
+	Id        string   `yaml:"id"`
+	Link      string   `yaml:"link"`
+	BlogRolls []string `yaml:"blogrolls"`
 }
 
 func NewFeedFrontmatter(feed_url string) *FeedFrontmatter {
@@ -91,6 +92,10 @@ func (f *FeedFrontmatter) WithTitle(title string) {
 
 func (f *FeedFrontmatter) WithLink(link string) {
 	f.Params.Link = link
+}
+
+func (f *FeedFrontmatter) WithBlogRolls(links []string) {
+	f.Params.BlogRolls = links
 }
 
 type LinkFrontmatter struct {
