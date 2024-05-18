@@ -103,13 +103,17 @@ type LinkFrontmatter struct {
 }
 
 type LinkParams struct {
-	SourceURL      string `yaml:"source_url"`
-	DestinationURL string `yaml:"destination_url"`
+	SourceType      NodeType `yaml:"source_type"`
+	SourceURL       string   `yaml:"source_url"`
+	DestinationType NodeType `yaml:"destination_type"`
+	DestinationURL  string   `yaml:"destination_url"`
 }
 
-func NewLinkFrontmatter(source_url, destination_url string) *LinkFrontmatter {
+func NewLinkFrontmatter(source_type NodeType, source_url string, destination_type NodeType, destination_url string) *LinkFrontmatter {
 	out := new(LinkFrontmatter)
+	out.Params.SourceType = source_type
 	out.Params.SourceURL = source_url
+	out.Params.DestinationType = destination_type
 	out.Params.DestinationURL = destination_url
 	return out
 }

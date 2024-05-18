@@ -2,7 +2,9 @@
 <opml version="2.0">
   <head></head>
   <body>
-    <outline text="Feed-A" xmlUrl="http://localhost:8000/a.xml" />
-    <outline text="Atom-Feed-1" xmlUrl="http://localhost:8000/atom.xml" />
+    <outline text="outer">
+      <outline text="Feed-A" xmlUrl="http://localhost:8000/a.xml" />
+      <outline text="Atom-Feed-1" xmlUrl="http://localhost:8000/atom.xml" />
+    </outline>
   </body>
 </opml>

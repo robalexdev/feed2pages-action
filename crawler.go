@@ -31,8 +31,8 @@ func (c *Crawler) Crawl(urls ...string) error {
 	return c.Queue.Run(c.Collector)
 }
 
-func (c *Crawler) Request(u, recommender string, depth int) {
-	parsed, err := url.Parse(u)
+func (c *Crawler) Request(recommender_type NodeType, recommender string, target_type NodeType, target string, depth int) {
+	parsed, err := url.Parse(target)
 	if err != nil {
 		return
 	}
@@ -42,13 +42,15 @@ func (c *Crawler) Request(u, recommender string, depth int) {
 		return
 	}
 
-	if blocked, domain := isBlockedDomain(u, c.Config); blocked {
+	if blocked, domain := isBlockedDomain(target, c.Config); blocked {
 		log.Printf("Skipping blocked domain: %d", domain)
 		return
 	}
 
 	ctx := colly.NewContext()
 	ctx.Put("rec", recommender)
+	ctx.Put("rec_type", recommender_type)
+	ctx.Put("target_type", target_type)
 	r := &colly.Request{
 		URL:    parsed,
 		Method: "GET",
@@ -58,11 +60,26 @@ func (c *Crawler) Request(u, recommender string, depth int) {
 	c.Queue.AddRequest(r)
 }
 
-func (c *Crawler) OnResponseHandler(r *colly.Response) {
-	// Save the recommendations link after it resolves
-	recommender := r.Ctx.Get("rec")
-	url := r.Request.URL.String()
-	NewLinkFrontmatter(recommender, url).Save(c.Config)
+func (c *Crawler) SaveFrontmatter(request *colly.Request) {
+	url := request.URL.String()
+	recommender := request.Ctx.Get("rec")
+	ctx_recommender_type := request.Ctx.GetAny("rec_type")
+	ctx_target_type := request.Ctx.GetAny("target_type")
+
+	recommender_type := NODE_TYPE_SEED
+	if ctx_recommender_type != nil {
+		recommender_type = ctx_recommender_type.(NodeType)
+	}
+	target_type := NODE_TYPE_FEED
+	if ctx_target_type != nil {
+		target_type = ctx_target_type.(NodeType)
+	}
+
+	NewLinkFrontmatter(recommender_type, recommender, target_type, url).Save(c.Config)
+}
+
+func (c *Crawler) OnXML_OpmlBody(body *colly.XMLElement) {
+	c.SaveFrontmatter(body.Request)
 }
 
 func (c *Crawler) OnXML_OpmlOutline(outline *colly.XMLElement) {
@@ -73,7 +90,11 @@ func (c *Crawler) OnXML_OpmlOutline(outline *colly.XMLElement) {
 		return
 	}
 	feedUrl = outline.Request.AbsoluteURL(feedUrl)
-	c.Request(feedUrl, blogroll_url, r.Depth+1)
+	c.Request(NODE_TYPE_BLOGROLL, blogroll_url, NODE_TYPE_FEED, feedUrl, r.Depth+1)
+}
+
+func (c *Crawler) OnXML_Rss(rss *colly.XMLElement) {
+	c.SaveFrontmatter(rss.Request)
 }
 
 func (c *Crawler) OnXML_RssChannel(channel *colly.XMLElement) {
@@ -117,21 +138,23 @@ func (c *Crawler) OnXML_RssChannel(channel *colly.XMLElement) {
 	if len(blogrolls) != 0 {
 		for _, blogroll := range blogrolls {
 			log.Printf("Found blogroll: %s", blogroll)
-			c.Request(blogroll, feed_url, r.Depth+1)
+			c.Request(NODE_TYPE_FEED, feed_url, NODE_TYPE_BLOGROLL, blogroll, r.Depth+1)
 		}
 	} else {
 		log.Printf("Searching for blogroll in: %s", link)
-		c.Request(link, feed_url, r.Depth+1)
+		c.Request(NODE_TYPE_FEED, feed_url, NODE_TYPE_WEBSITE, link, r.Depth+1)
 		recLink, err := buildRecommendationUrl(link)
 		if err != nil {
 			log.Println(err)
 		} else {
-			c.Request(recLink, feed_url, r.Depth+1)
+			c.Request(NODE_TYPE_FEED, feed_url, NODE_TYPE_BLOGROLL, recLink, r.Depth+1)
 		}
 	}
 }
 
 func (c *Crawler) OnXML_AtomFeed(channel *colly.XMLElement) {
+	c.SaveFrontmatter(channel.Request)
+
 	r := channel.Request
 	feed_url := r.URL.String()
 
@@ -272,6 +295,15 @@ func (c *Crawler) OnXML_AtomEntry(item *colly.XMLElement) {
 	}
 }
 
+func (c *Crawler) OnHTML_Body(body *colly.HTMLElement) {
+	target_type := body.Request.Ctx.GetAny("target_type")
+	// Fliter out anything that's not expected to be a website
+	// Otherwise we "find" OPML blogrolls that are actually blank 404 pages
+	if target_type == NODE_TYPE_WEBSITE {
+		c.SaveFrontmatter(body.Request)
+	}
+}
+
 // Example:
 // <link rel="blogroll" type="text/xml" href="https://feedland.com/opml?screenname=davewiner&catname=blogroll">
 func (c *Crawler) OnHTML_RelLink(element *colly.HTMLElement) {
@@ -286,7 +318,7 @@ func (c *Crawler) OnHTML_RelLink(element *colly.HTMLElement) {
 	href = r.AbsoluteURL(href)
 	if rel == "blogroll" && (t == "" || t == "text/xml" || t == "application/atom+xml") {
 		log.Printf("Blogroll from HTML: %s", href)
-		c.Request(href, page_url, r.Depth+1)
+		c.Request(NODE_TYPE_WEBSITE, page_url, NODE_TYPE_BLOGROLL, href, r.Depth+1)
 	}
 }
 
@@ -309,13 +341,14 @@ func NewCrawler(config *ParsedConfig) Crawler {
 	crawler.Collector.WithTransport(t)
 	crawler.Collector.IgnoreRobotsTxt = false
 	crawler.Collector.OnRequest(OnRequestHandler)
-	crawler.Collector.OnResponse(crawler.OnResponseHandler)
 	crawler.Collector.OnError(OnErrorHandler)
 
 	// OPML blogroll
+	crawler.Collector.OnXML("/opml/body", crawler.OnXML_OpmlBody)
 	crawler.Collector.OnXML("/opml/body//outline", crawler.OnXML_OpmlOutline)
 
 	// RSS feed
+	crawler.Collector.OnXML("/rss", crawler.OnXML_Rss)
 	crawler.Collector.OnXML("/rss/channel", crawler.OnXML_RssChannel)
 	crawler.Collector.OnXML("/rss/channel/item", crawler.OnXML_RssItem)
 
@@ -324,6 +357,7 @@ func NewCrawler(config *ParsedConfig) Crawler {
 	crawler.Collector.OnXML("/feed/entry", crawler.OnXML_AtomEntry)
 
 	// HTML page
+	crawler.Collector.OnHTML("html", crawler.OnHTML_Body)
 	crawler.Collector.OnHTML("link[rel='blogroll']", crawler.OnHTML_RelLink)
 
 	crawler.Queue, err = queue.New(
