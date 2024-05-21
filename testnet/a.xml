@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:source="http://source.scripting.com/">
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:s="http://source.scripting.com/">
 <channel>
   <title>Test Feed A</title>
   <link>http://localhost:8000/</link>
   <description>Test RSS Feed A</description>
   <pubDate>Sat, 07 Sep 2002 00:00:01 GMT</pubDate>
 
-  <source:blogroll>http://localhost:8000/a.opml</source:blogroll>
+  <!-- custom namespace -->
+  <s:blogroll>http://localhost:8000/a.opml</s:blogroll>
 
   <item>
     <title>Post A 1</title>

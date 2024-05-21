@@ -1,6 +1,8 @@
 package main
 
 import (
+	"net"
+	"net/http"
 	"time"
 )
 
@@ -25,6 +27,20 @@ type Config struct {
 	DiscoverDepth             *int `yaml:"discover_depth"`
 	MaxRecommendationsPerFeed *int `yaml:"max_recommendations_per_feed"`
 	MaxRecommendations        *int `yaml:"max_recommendations"`
+
+	CrawlThreads   *int `yaml:"crawl_threads"`
+	RequestTimeout *int `yaml:"request_timeout_ms"`
+
+	// HTTP transport settings
+	HttpDialKeepAlive         *int `yaml:"http_dial_keep_alive_ms"`
+	HttpDialTimeout           *int `yaml:"http_dial_timeout_ms"`
+	HttpExpectContinueTimeout *int `yaml:"http_expect_continue_timeout_ms"`
+	HttpIdleConnTimeout       *int `yaml:"http_idle_conn_timeout_ms"`
+	HttpTLSHandshakeTimeout   *int `yaml:"http_tls_handshake_timeout_ms"`
+	HttpResponseHeaderTimeout *int `yaml:"http_response_header_timeout_ms"`
+
+	HttpDialDualStack *bool `yaml:"http_dial_dual_stack"`
+	HttpMaxIdleConns  *int  `yaml:"http_max_idle_conns"`
 }
 
 func strDefault(a *string, b string) string {
@@ -39,6 +55,14 @@ func intDefault(a *int, b int) int {
 		return *a
 	}
 	return b
+}
+
+func durationDefaultNil(a_ms *int) *time.Duration {
+	if a_ms != nil {
+		r := time.Duration(*a_ms) * time.Millisecond
+		return &r
+	}
+	return nil
 }
 
 func (c *Config) Parse() *ParsedConfig {
@@ -66,6 +90,19 @@ func (c *Config) Parse() *ParsedConfig {
 	out.MaxRecommendations = intDefault(c.MaxRecommendations, 1000)
 	out.MaxRecommendationsPerFeed = intDefault(c.MaxRecommendationsPerFeed, 100)
 
+	out.CrawlThreads = intDefault(c.CrawlThreads, 8)
+	out.RequestTimeout = durationDefaultNil(c.RequestTimeout)
+
+	out.HttpDialTimeout = durationDefaultNil(c.HttpDialTimeout)
+	out.HttpDialKeepAlive = durationDefaultNil(c.HttpDialKeepAlive)
+	out.HttpIdleConnTimeout = durationDefaultNil(c.HttpIdleConnTimeout)
+	out.HttpTLSHandshakeTimeout = durationDefaultNil(c.HttpTLSHandshakeTimeout)
+	out.HttpExpectContinueTimeout = durationDefaultNil(c.HttpExpectContinueTimeout)
+	out.HttpResponseHeaderTimeout = durationDefaultNil(c.HttpResponseHeaderTimeout)
+
+	out.HttpMaxIdleConns = c.HttpMaxIdleConns
+	out.HttpDialDualStack = c.HttpDialDualStack
+
 	return out
 }
 
@@ -89,4 +126,60 @@ type ParsedConfig struct {
 	DiscoverDepth             int
 	MaxRecommendations        int
 	MaxRecommendationsPerFeed int
+
+	CrawlThreads   int
+	RequestTimeout *time.Duration
+
+	HttpDialKeepAlive         *time.Duration
+	HttpDialTimeout           *time.Duration
+	HttpExpectContinueTimeout *time.Duration
+	HttpIdleConnTimeout       *time.Duration
+	HttpTLSHandshakeTimeout   *time.Duration
+	HttpResponseHeaderTimeout *time.Duration
+
+	HttpDialDualStack *bool
+	HttpMaxIdleConns  *int
+}
+
+func (c *ParsedConfig) BuildTransport() *http.Transport {
+	// Defaults: https://pkg.go.dev/net/http#DefaultTransport
+	d := &net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}
+	t := &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		DialContext:           d.DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
+	if c.HttpDialTimeout != nil {
+		d.Timeout = *c.HttpDialTimeout
+	}
+	if c.HttpDialKeepAlive != nil {
+		d.KeepAlive = *c.HttpDialKeepAlive
+	}
+	if c.HttpDialDualStack != nil {
+		d.DualStack = *c.HttpDialDualStack
+	}
+	if c.HttpMaxIdleConns != nil {
+		t.MaxIdleConns = *c.HttpMaxIdleConns
+	}
+	if c.HttpIdleConnTimeout != nil {
+		t.IdleConnTimeout = *c.HttpIdleConnTimeout
+	}
+	if c.HttpTLSHandshakeTimeout != nil {
+		t.TLSHandshakeTimeout = *c.HttpTLSHandshakeTimeout
+	}
+	if c.HttpExpectContinueTimeout != nil {
+		t.ExpectContinueTimeout = *c.HttpExpectContinueTimeout
+	}
+	if c.HttpResponseHeaderTimeout != nil {
+		t.ResponseHeaderTimeout = *c.HttpResponseHeaderTimeout
+	}
+	return t
 }

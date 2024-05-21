@@ -1,6 +1,9 @@
 package main
 
 import (
+	"bytes"
+	"github.com/antchfx/xmlquery"
+	"github.com/antchfx/xpath"
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/queue"
 	"log"
@@ -10,9 +13,10 @@ import (
 )
 
 type Crawler struct {
-	Collector *colly.Collector
-	Config    *ParsedConfig
-	Queue     *queue.Queue
+	Collector                  *colly.Collector
+	Config                     *ParsedConfig
+	Queue                      *queue.Queue
+	BlogrollWithNamespaceXPath *xpath.Expr
 }
 
 func OnErrorHandler(resp *colly.Response, err error) {
@@ -47,6 +51,16 @@ func (c *Crawler) Request(recommender_type NodeType, recommender string, target_
 		return
 	}
 
+	if target_type == NODE_TYPE_BLOGROLL {
+		// Special case:
+		// When we find a website we guess that it may have a blogroll at the well-known
+		// URL. But we don't want to track it until we load it
+	} else {
+		// Others are tracked immediately as someone thought the URL was valid enough
+		// to link to it.
+		NewLinkFrontmatter(recommender_type, recommender, target_type, target).Save(c.Config)
+	}
+
 	ctx := colly.NewContext()
 	ctx.Put("rec", recommender)
 	ctx.Put("rec_type", recommender_type)
@@ -78,290 +92,81 @@ func (c *Crawler) SaveFrontmatter(request *colly.Request) {
 	NewLinkFrontmatter(recommender_type, recommender, target_type, url).Save(c.Config)
 }
 
-func (c *Crawler) OnXML_OpmlBody(body *colly.XMLElement) {
-	c.SaveFrontmatter(body.Request)
-}
-
-func (c *Crawler) OnXML_OpmlOutline(outline *colly.XMLElement) {
-	r := outline.Request
-	blogroll_url := r.URL.String()
-	feedUrl := outline.Attr("xmlUrl")
-	if feedUrl == "" {
-		return
-	}
-	feedUrl = outline.Request.AbsoluteURL(feedUrl)
-	c.Request(NODE_TYPE_BLOGROLL, blogroll_url, NODE_TYPE_FEED, feedUrl, r.Depth+1)
-}
-
-func (c *Crawler) OnXML_Rss(rss *colly.XMLElement) {
-	c.SaveFrontmatter(rss.Request)
-}
-
-func (c *Crawler) OnXML_RssChannel(channel *colly.XMLElement) {
-	r := channel.Request
-	feed_url := r.URL.String()
-
-	link := channel.ChildText("/link")
-	title := channel.ChildText("/title")
-	description := channel.ChildText("/description")
-	date := channel.ChildText("/pubDate")
-	blogrolls := channel.ChildTexts("/source:blogroll")
-
-	feed := NewFeedFrontmatter(feed_url)
-	feed.WithDate(date)
-	feed.WithTitle(title)
-	feed.WithDescription(description)
-	feed.WithLink(link)
-	feed.WithBlogRolls(blogrolls)
-
-	if blocked, domain := isBlockedDomain(link, c.Config); blocked {
-		log.Printf("Domain is blocked: %s", domain)
-		return
-	}
-	if blocked, blockWord := hasBlockWords(title, c.Config); blocked {
-		log.Printf("Word in title is blocked: %s", blockWord)
-		return
-	}
-	if blocked, blockWord := hasBlockWords(description, c.Config); blocked {
-		log.Printf("Word in description is blocked: %s", blockWord)
-		return
-	}
-	if isBlockedPost(link, title, feed.Params.Id, c.Config) {
-		return
-	}
-
-	log.Println("DEPTH:", r.Depth)
-	isDirect := r.Depth < 4
-	feed.Save(isDirect, c.Config)
-
-	// Check for blogrolls
-	if len(blogrolls) != 0 {
-		for _, blogroll := range blogrolls {
-			log.Printf("Found blogroll: %s", blogroll)
-			c.Request(NODE_TYPE_FEED, feed_url, NODE_TYPE_BLOGROLL, blogroll, r.Depth+1)
-		}
-	} else {
-		log.Printf("Searching for blogroll in: %s", link)
-		c.Request(NODE_TYPE_FEED, feed_url, NODE_TYPE_WEBSITE, link, r.Depth+1)
-		recLink, err := buildRecommendationUrl(link)
-		if err != nil {
-			log.Println(err)
-		} else {
-			c.Request(NODE_TYPE_FEED, feed_url, NODE_TYPE_BLOGROLL, recLink, r.Depth+1)
-		}
+func processXmlQuery(r *colly.Request, xpathStr string, nav *xmlquery.Node, callback func(*colly.Request, *xmlquery.Node)) {
+	foundNodes := xmlquery.Find(nav, xpathStr)
+	for _, found := range foundNodes {
+		callback(r, found)
 	}
 }
 
-func (c *Crawler) OnXML_AtomFeed(channel *colly.XMLElement) {
-	c.SaveFrontmatter(channel.Request)
-
-	r := channel.Request
-	feed_url := r.URL.String()
-
-	link := channel.ChildAttr("/link[@rel='alternate']", "href")
-	if link == "" {
-		// Fallback link (any)
-		link = channel.ChildAttr("/link", "href")
-	}
-	title := channel.ChildText("/title")
-	description := channel.ChildText("/subtitle")
-	date := channel.ChildText("/updated") // TODO: change format
-
-	feed := NewFeedFrontmatter(feed_url)
-	feed.WithDate(date)
-	feed.WithTitle(title)
-	feed.WithDescription(description)
-	feed.WithLink(link)
-
-	if blocked, domain := isBlockedDomain(link, c.Config); blocked {
-		log.Printf("Domain is blocked: %s", domain)
-		return
-	}
-	if blocked, blockWord := hasBlockWords(title, c.Config); blocked {
-		log.Printf("Word in title is blocked: %s", blockWord)
-		return
-	}
-	if blocked, blockWord := hasBlockWords(description, c.Config); blocked {
-		log.Printf("Word in description is blocked: %s", blockWord)
-		return
-	}
-	if isBlockedPost(link, title, feed.Params.Id, c.Config) {
+func (c *Crawler) OnResponseHandler(resp *colly.Response) {
+	r := resp.Request
+	if resp.StatusCode != 200 {
 		return
 	}
 
-	log.Println("DEPTH:", r.Depth)
-	isDirect := r.Depth < 4
-	feed.Save(isDirect, c.Config)
-
-	// Atom feeds don't have a blogroll syntax yet
-	// Add here when they do
-}
-
-func (c *Crawler) OnXML_RssItem(item *colly.XMLElement) {
-	r := item.Request
-	feed_url := r.URL.String()
-
-	if r.Depth > 2 {
+	opts := xmlquery.ParserOptions{
+		Decoder: &xmlquery.DecoderOptions{
+			Strict: false,
+		},
+	}
+	doc, err := xmlquery.ParseWithOptions(bytes.NewBuffer(resp.Body), opts)
+	if err != nil {
+		log.Printf("Unable to parse as XML for %s: %v", r.URL.String(), err)
 		return
 	}
 
-	post_id := item.ChildText("/guid")
-	link := item.ChildText("/link")
-	title := item.ChildText("/title")
-	description := item.ChildText("/description")
-	date := item.ChildText("/pubDate")
-	content := item.ChildText("/content")
-
-	post := NewPostFrontmatter(post_id, link)
-	post.WithTitle(title)
-	post.WithDescription(description)
-	post.WithDate(date)
-	post.WithContent(content)
-	post.WithFeedLink(feed_url)
-
-	if blocked, domain := isBlockedDomain(link, c.Config); blocked {
-		log.Printf("Domain is blocked: %s", domain)
-		return
-	}
-	if blocked, blockWord := hasBlockWords(title, c.Config); blocked {
-		log.Printf("Word in title is blocked: %s", blockWord)
-		return
-	}
-	if blocked, blockWord := hasBlockWords(description, c.Config); blocked {
-		log.Printf("Word in description is blocked: %s", blockWord)
-		return
-	}
-	if blocked, blockWord := hasBlockWords(content, c.Config); blocked {
-		log.Printf("Word in content is blocked: %s", blockWord)
-		return
-	}
-	if isBlockedPost(link, title, post.Params.Id, c.Config) {
-		return
-	}
-
-	if title != "" {
-		post.Save(c.Config)
-	}
-}
-
-func (c *Crawler) OnXML_AtomEntry(item *colly.XMLElement) {
-	r := item.Request
-	feed_url := r.URL.String()
-
-	if r.Depth > 2 {
-		return
-	}
-
-	post_id := item.ChildText("/id")
-	link := item.ChildAttr("/link[@rel='alternate']", "href")
-	if link == "" {
-		// Fallback link (any)
-		link = item.ChildAttr("/link", "href")
-	}
-	title := item.ChildText("/title")
-	date := item.ChildText("/updated")
-	content := item.ChildText("/content")
-	description := "" // Not supported
-
-	post := NewPostFrontmatter(post_id, link)
-	post.WithTitle(title)
-	post.WithDescription(description)
-	post.WithDate(date)
-	post.WithContent(content)
-	post.WithFeedLink(feed_url)
-
-	if blocked, domain := isBlockedDomain(link, c.Config); blocked {
-		log.Printf("Domain is blocked: %s", domain)
-		return
-	}
-	if blocked, blockWord := hasBlockWords(title, c.Config); blocked {
-		log.Printf("Word in title is blocked: %s", blockWord)
-		return
-	}
-	if blocked, blockWord := hasBlockWords(description, c.Config); blocked {
-		log.Printf("Word in description is blocked: %s", blockWord)
-		return
-	}
-	if blocked, blockWord := hasBlockWords(content, c.Config); blocked {
-		log.Printf("Word in content is blocked: %s", blockWord)
-		return
-	}
-	if isBlockedPost(link, title, post.Params.Id, c.Config) {
-		return
-	}
-
-	if title != "" {
-		post.Save(c.Config)
-	}
-}
-
-func (c *Crawler) OnHTML_Body(body *colly.HTMLElement) {
-	target_type := body.Request.Ctx.GetAny("target_type")
-	// Fliter out anything that's not expected to be a website
-	// Otherwise we "find" OPML blogrolls that are actually blank 404 pages
-	if target_type == NODE_TYPE_WEBSITE {
-		c.SaveFrontmatter(body.Request)
-	}
-}
-
-// Example:
-// <link rel="blogroll" type="text/xml" href="https://feedland.com/opml?screenname=davewiner&catname=blogroll">
-func (c *Crawler) OnHTML_RelLink(element *colly.HTMLElement) {
-	r := element.Request
-	page_url := r.URL.String()
-	rel := element.Attr("rel")
-	t := element.Attr("type")
-	href := element.Attr("href")
-	if href == "" {
-		return
-	}
-	href = r.AbsoluteURL(href)
-	if rel == "blogroll" && (t == "" || t == "text/xml" || t == "application/atom+xml") {
-		log.Printf("Blogroll from HTML: %s", href)
-		c.Request(NODE_TYPE_WEBSITE, page_url, NODE_TYPE_BLOGROLL, href, r.Depth+1)
-	}
+	processXmlQuery(r, "/opml/body", doc, c.OnXML_OpmlBody)
+	processXmlQuery(r, "/opml/body//outline", doc, c.OnXML_OpmlOutline)
+	processXmlQuery(r, "/rss/channel", doc, c.OnXML_RssChannel)
+	processXmlQuery(r, "/rss/channel/item", doc, c.OnXML_RssItem)
+	processXmlQuery(r, "/feed", doc, c.OnXML_AtomFeed)
+	processXmlQuery(r, "/feed/entry", doc, c.OnXML_AtomEntry)
 }
 
 func NewCrawler(config *ParsedConfig) Crawler {
 	crawler := Crawler{}
 	crawler.Config = config
 
+	var err error
+	nsMap := map[string]string{
+		"source": "http://source.scripting.com/",
+	}
+	crawler.BlogrollWithNamespaceXPath, err = xpath.CompileWithNS("source:blogroll", nsMap)
+	if err != nil {
+		panic(err)
+	}
+
 	workingDir, err := os.Getwd()
 	if err != nil {
 		panic(err)
 	}
 
-	t := &http.Transport{}
-	t.RegisterProtocol("file", http.NewFileTransport(http.Dir(workingDir)))
-
 	crawler.Collector = colly.NewCollector(
 		colly.MaxDepth(config.DiscoverDepth),
 		colly.UserAgent(USER_AGENT),
 	)
+
+	t := config.BuildTransport()
+	t.RegisterProtocol("file", http.NewFileTransport(http.Dir(workingDir)))
 	crawler.Collector.WithTransport(t)
+	crawler.Collector.DisableCookies()
+
 	crawler.Collector.IgnoreRobotsTxt = false
+	if config.RequestTimeout != nil {
+		crawler.Collector.SetRequestTimeout(*config.RequestTimeout)
+	}
 	crawler.Collector.OnRequest(OnRequestHandler)
 	crawler.Collector.OnError(OnErrorHandler)
 
-	// OPML blogroll
-	crawler.Collector.OnXML("/opml/body", crawler.OnXML_OpmlBody)
-	crawler.Collector.OnXML("/opml/body//outline", crawler.OnXML_OpmlOutline)
+	// XML handled here: OPML, RSS, Atom
+	crawler.Collector.OnResponse(crawler.OnResponseHandler)
 
-	// RSS feed
-	crawler.Collector.OnXML("/rss", crawler.OnXML_Rss)
-	crawler.Collector.OnXML("/rss/channel", crawler.OnXML_RssChannel)
-	crawler.Collector.OnXML("/rss/channel/item", crawler.OnXML_RssItem)
-
-	// Atom feed
-	crawler.Collector.OnXML("/feed", crawler.OnXML_AtomFeed)
-	crawler.Collector.OnXML("/feed/entry", crawler.OnXML_AtomEntry)
-
-	// HTML page
-	crawler.Collector.OnHTML("html", crawler.OnHTML_Body)
+	// HTML pages
 	crawler.Collector.OnHTML("link[rel='blogroll']", crawler.OnHTML_RelLink)
 
 	crawler.Queue, err = queue.New(
-		8,
+		config.CrawlThreads,
 		&queue.InMemoryQueueStorage{MaxSize: 10000},
 	)
 	if err != nil {

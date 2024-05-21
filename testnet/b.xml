@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:source="http://source.scripting.com/">
+<rss version="2.0"> 
 <channel>
   <title>testing</title>
   <link>http://localhost:8000/</link>
   <description>Test RSS Feed</description>
 
+  <!-- undefined namespace -->
   <source:blogroll>http://localhost:8000/b.opml</source:blogroll>
 
   <item>
