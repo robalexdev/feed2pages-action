@@ -15,9 +15,9 @@ A blogroll generator for [Hugo](https://gohugo.io/)-based websites that aggregat
 
 Please check out these example repos for help getting started:
 
-* [feed2pages-example](https://github.com/ralexander-phi/feed2pages-demo) - A generic quick start example
-* [feed2pages-paper](https://github.com/ralexander-phi/feed2Pages-paper) - A Hugo PaperMod example
-* [author's feeds](https://github.com/ralexander-phi/feeds) - The feeds for this project's author
+* [feed2pages](https://github.com/ralexander-phi/feed2pages) - A generic quick start example
+* [feed2pages-papermod](https://github.com/ralexander-phi/feed2pages-papermod) - A Hugo PaperMod example
+* [Author's feeds](https://github.com/ralexander-phi/feeds) - The blogroll this project was built to generate
 
 
 ## Development
