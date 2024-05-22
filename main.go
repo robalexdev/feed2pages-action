@@ -4,5 +4,5 @@ func main() {
 	config := parseConfig()
 	cleanupContentOutputDirs(config)
 	crawler := NewCrawler(config)
-	crawler.Crawl(config.FeedUrl)
+	crawler.Crawl(config.FeedUrls...)
 }

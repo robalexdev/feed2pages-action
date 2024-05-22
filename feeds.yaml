@@ -1,3 +1,4 @@
-feed_url: http://localhost:8000/initial.opml
+feed_urls:
+  - http://localhost:8000/initial.opml
 discover_depth: 100
 crawl_threads: 1

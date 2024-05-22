@@ -7,7 +7,7 @@ import (
 )
 
 type Config struct {
-	FeedUrl string `yaml:"feed_url"`
+	FeedUrls []string `yaml:"feed_urls"`
 
 	// Post limits and filters
 	BlockWords       []string `yaml:"block_words"`
@@ -67,7 +67,7 @@ func durationDefaultNil(a_ms *int) *time.Duration {
 
 func (c *Config) Parse() *ParsedConfig {
 	out := new(ParsedConfig)
-	out.FeedUrl = c.FeedUrl
+	out.FeedUrls = c.FeedUrls
 	out.BlockWords = c.BlockWords
 	out.BlockDomains = c.BlockDomains
 
@@ -107,7 +107,7 @@ func (c *Config) Parse() *ParsedConfig {
 }
 
 type ParsedConfig struct {
-	FeedUrl string
+	FeedUrls []string
 
 	BlockWords   []string
 	BlockDomains []string

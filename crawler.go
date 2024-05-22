@@ -89,6 +89,10 @@ func (c *Crawler) SaveFrontmatter(request *colly.Request) {
 		target_type = ctx_target_type.(NodeType)
 	}
 
+	if url == "" || recommender == "" {
+		return
+	}
+
 	NewLinkFrontmatter(recommender_type, recommender, target_type, url).Save(c.Config)
 }
 
