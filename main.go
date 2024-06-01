@@ -5,4 +5,5 @@ func main() {
 	cleanupContentOutputDirs(config)
 	crawler := NewCrawler(config)
 	crawler.Crawl(config.FeedUrls...)
+	crawler.PurgeNoIndex()
 }

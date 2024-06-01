@@ -9,10 +9,11 @@ type PostFrontmatter struct {
 }
 
 type PostParams struct {
-	Content string `yaml:"content"`
-	FeedId  string `yaml:"feed_id"`
-	Id      string `yaml:"id"`
-	Link    string `yaml:"link"`
+	Content    string   `yaml:"content"`
+	FeedId     string   `yaml:"feed_id"`
+	Id         string   `yaml:"id"`
+	Link       string   `yaml:"link"`
+	Categories []string `yaml:"categories"`
 }
 
 func NewPostFrontmatter(guid, link string) *PostFrontmatter {
@@ -22,13 +23,12 @@ func NewPostFrontmatter(guid, link string) *PostFrontmatter {
 	return out
 }
 
-func (f *PostFrontmatter) Save(config *ParsedConfig) {
-	path := generatedFilePath(config.ReadingFolderName, POST_PREFIX, f.Params.Id)
-	writeYaml(f, path)
-}
-
 func (f *PostFrontmatter) WithTitle(title string) {
 	f.Title = truncateText(title, 200)
+}
+
+func (f *PostFrontmatter) WithCategories(cats []string) {
+	f.Params.Categories = append(f.Params.Categories, cats...)
 }
 
 func (f *PostFrontmatter) WithDescription(description string) {
@@ -55,10 +55,12 @@ type FeedFrontmatter struct {
 }
 
 type FeedParams struct {
-	FeedLink  string   `yaml:"feedlink"`
-	Id        string   `yaml:"id"`
-	Link      string   `yaml:"link"`
-	BlogRolls []string `yaml:"blogrolls"`
+	FeedLink   string   `yaml:"feedlink"`
+	Id         string   `yaml:"id"`
+	Link       string   `yaml:"link"`
+	BlogRolls  []string `yaml:"blogrolls"`
+	FeedType   string   `yaml:"feedtype"`
+	Categories []string `yaml:"categories"`
 }
 
 func NewFeedFrontmatter(feed_url string) *FeedFrontmatter {
@@ -66,16 +68,6 @@ func NewFeedFrontmatter(feed_url string) *FeedFrontmatter {
 	out.Params.Id = buildSafeId("", feed_url)
 	out.Params.FeedLink = feed_url
 	return out
-}
-
-func (f *FeedFrontmatter) Save(isDirect bool, config *ParsedConfig) {
-	var path string
-	if isDirect {
-		path = generatedFilePath(config.FollowingFolderName, FEED_PREFIX, f.Params.Id)
-	} else {
-		path = generatedFilePath(config.DiscoverFolderName, FEED_PREFIX, f.Params.Id)
-	}
-	writeYaml(f, path)
 }
 
 func (f *FeedFrontmatter) WithDate(date string) {
@@ -94,6 +86,14 @@ func (f *FeedFrontmatter) WithLink(link string) {
 	f.Params.Link = link
 }
 
+func (f *FeedFrontmatter) WithFeedType(feedType string) {
+	f.Params.FeedType = feedType
+}
+
+func (f *FeedFrontmatter) WithCategories(cats []string) {
+	f.Params.Categories = append(f.Params.Categories, cats...)
+}
+
 func (f *FeedFrontmatter) WithBlogRolls(links []string) {
 	f.Params.BlogRolls = links
 }
@@ -107,23 +107,19 @@ type LinkParams struct {
 	SourceURL       string   `yaml:"source_url"`
 	DestinationType NodeType `yaml:"destination_type"`
 	DestinationURL  string   `yaml:"destination_url"`
+	LinkType        string   `yaml:"link_type"`
 }
 
-func NewLinkFrontmatter(source_type NodeType, source_url string, destination_type NodeType, destination_url string) *LinkFrontmatter {
+func NewLinkFrontmatter(source_type NodeType, source_url string, destination_type NodeType, destination_url, link_type string) *LinkFrontmatter {
 	out := new(LinkFrontmatter)
 	out.Params.SourceType = source_type
 	out.Params.SourceURL = source_url
 	out.Params.DestinationType = destination_type
 	out.Params.DestinationURL = destination_url
+	out.Params.LinkType = link_type
 	return out
 }
 
 func buildLinkId(source, dest string) string {
 	return md5Hex(source + "\n" + dest)
-}
-
-func (f *LinkFrontmatter) Save(config *ParsedConfig) {
-	id := buildLinkId(f.Params.SourceURL, f.Params.DestinationURL)
-	path := generatedFilePath(config.NetworkFolderName, LINK_PREFIX, id)
-	writeYaml(f, path)
 }

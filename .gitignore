@@ -3,3 +3,4 @@ util
 content/
 public/
 .hugo_build.lock
+feed2pages.db

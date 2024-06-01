@@ -1,2 +1,5 @@
-User-agent: *
+User-agent: Feed2Pages/0.1
 Disallow: /blocked.xml
+
+User-agent: *
+Disallow: /

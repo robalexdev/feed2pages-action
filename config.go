@@ -3,6 +3,7 @@ package main
 import (
 	"net"
 	"net/http"
+	"slices"
 	"time"
 )
 
@@ -17,11 +18,18 @@ type Config struct {
 	MaxPostsPerFeed  *int     `yaml:"max_posts_per_feed"`
 	MaxPosts         *int     `yaml:"max_posts"`
 
+	// Output modes
+	OutputModes []string `yaml:"output_mode"`
+
 	// Output folders
 	ReadingFolderName   *string `yaml:"reading_folder_name"`
 	FollowingFolderName *string `yaml:"following_folder_name"`
 	DiscoverFolderName  *string `yaml:"discover_folder_name"`
 	NetworkFolderName   *string `yaml:"network_folder_name"`
+
+	// Should we add content on-top-of existing content
+	// or should we remove and replace it?
+	RemoveOldContent *bool `yaml:"remove_old_content"`
 
 	// Discovery of recommended feeds
 	DiscoverDepth             *int `yaml:"discover_depth"`
@@ -41,9 +49,21 @@ type Config struct {
 
 	HttpDialDualStack *bool `yaml:"http_dial_dual_stack"`
 	HttpMaxIdleConns  *int  `yaml:"http_max_idle_conns"`
+
+	// Proxy settings
+	HttpProxyURL *string `yaml:"http_proxy_url"`
+
+	HttpOnlyHosts []string `yaml:"http_only_hosts"`
 }
 
 func strDefault(a *string, b string) string {
+	if a != nil {
+		return *a
+	}
+	return b
+}
+
+func boolDefault(a *bool, b bool) bool {
 	if a != nil {
 		return *a
 	}
@@ -65,6 +85,20 @@ func durationDefaultNil(a_ms *int) *time.Duration {
 	return nil
 }
 
+func (c *Config) ParseOutputMode() []OutputMode {
+	if len(c.OutputModes) == 0 {
+		// Default to Hugo Content
+		return []OutputMode{OUTPUT_MODE_HUGO_CONTENT}
+	} else {
+		for _, mode := range c.OutputModes {
+			if !slices.Contains(OUTPUT_MODES, mode) {
+				panicf("Unknown output mode: %s", mode)
+			}
+		}
+		return c.OutputModes
+	}
+}
+
 func (c *Config) Parse() *ParsedConfig {
 	out := new(ParsedConfig)
 	out.FeedUrls = c.FeedUrls
@@ -76,10 +110,14 @@ func (c *Config) Parse() *ParsedConfig {
 		out.BlockPosts[blockTerm] = true
 	}
 
+	out.OutputModes = c.ParseOutputMode()
+
 	out.ReadingFolderName = strDefault(c.ReadingFolderName, contentPath(DEFAULT_READING_FOLDER))
 	out.FollowingFolderName = strDefault(c.FollowingFolderName, contentPath(DEFAULT_FOLLOWING_FOLDER))
 	out.DiscoverFolderName = strDefault(c.DiscoverFolderName, contentPath(DEFAULT_DISCOVER_FOLDER))
 	out.NetworkFolderName = strDefault(c.NetworkFolderName, contentPath(DEFAULT_NETWORK_FOLDER))
+
+	out.RemoveOldContent = boolDefault(c.RemoveOldContent, true)
 
 	ageLimit := -1 * intDefault(c.PostAgeLimitDays, 36500) // about 100 years ago
 	out.PostAgeLimit = time.Now().AddDate(0, 0, ageLimit)
@@ -103,6 +141,10 @@ func (c *Config) Parse() *ParsedConfig {
 	out.HttpMaxIdleConns = c.HttpMaxIdleConns
 	out.HttpDialDualStack = c.HttpDialDualStack
 
+	out.HttpProxyURL = c.HttpProxyURL
+
+	out.HttpOnlyHosts = c.HttpOnlyHosts
+
 	return out
 }
 
@@ -114,10 +156,14 @@ type ParsedConfig struct {
 
 	BlockPosts map[string]bool
 
+	OutputModes []OutputMode
+
 	ReadingFolderName   string
 	FollowingFolderName string
 	DiscoverFolderName  string
 	NetworkFolderName   string
+
+	RemoveOldContent bool
 
 	PostAgeLimit time.Time
 
@@ -139,6 +185,9 @@ type ParsedConfig struct {
 
 	HttpDialDualStack *bool
 	HttpMaxIdleConns  *int
+
+	HttpProxyURL  *string
+	HttpOnlyHosts []string
 }
 
 func (c *ParsedConfig) BuildTransport() *http.Transport {

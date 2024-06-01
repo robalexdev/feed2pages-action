@@ -1,9 +1,11 @@
 package main
 
 import (
+	"cmp"
 	"github.com/antchfx/xmlquery"
 	"github.com/gocolly/colly/v2"
 	"log"
+	"slices"
 )
 
 func (c *Crawler) OnXML_RssChannel(r *colly.Request, channel *xmlquery.Node) {
@@ -13,6 +15,7 @@ func (c *Crawler) OnXML_RssChannel(r *colly.Request, channel *xmlquery.Node) {
 	title := xmlText(channel, "title")
 	description := xmlText(channel, "description")
 	date := xmlText(channel, "pubDate")
+	categories := xmlTextMultiple(channel, "category")
 
 	// First try a namespace aware query for blogroll
 	blogrolls := xmlquery.QuerySelectorAll(channel, c.BlogrollWithNamespaceXPath)
@@ -32,7 +35,9 @@ func (c *Crawler) OnXML_RssChannel(r *colly.Request, channel *xmlquery.Node) {
 	feed.WithTitle(title)
 	feed.WithDescription(description)
 	feed.WithLink(link)
+	feed.WithFeedType("rss")
 	feed.WithBlogRolls(blogrollUrls)
+	feed.WithCategories(categories)
 
 	if blocked, domain := isBlockedDomain(link, c.Config); blocked {
 		log.Printf("Domain is blocked: %s", domain)
@@ -52,32 +57,54 @@ func (c *Crawler) OnXML_RssChannel(r *colly.Request, channel *xmlquery.Node) {
 
 	log.Println("DEPTH:", r.Depth)
 	isDirect := r.Depth < 4
-	feed.Save(isDirect, c.Config)
+
+	c.SaveFeed(feed, isDirect)
 
 	// Check for blogrolls
 	for _, blogroll := range blogrollUrls {
 		log.Printf("Found blogroll: %s", blogroll)
-		c.Request(NODE_TYPE_FEED, feed_url, NODE_TYPE_BLOGROLL, blogroll, r.Depth+1)
+		c.Request(NODE_TYPE_FEED, feed_url, NODE_TYPE_BLOGROLL, blogroll, LINK_TYPE_FROM_FEED, r.Depth+1)
 	}
 
 	if link != "" {
 		log.Printf("Searching for blogroll in: %s", link)
-		c.Request(NODE_TYPE_FEED, feed_url, NODE_TYPE_WEBSITE, link, r.Depth+1)
-		recLink, err := buildRecommendationUrl(link)
-		if err != nil {
-			log.Println(err)
-		} else {
-			c.Request(NODE_TYPE_FEED, feed_url, NODE_TYPE_BLOGROLL, recLink, r.Depth+1)
+		c.Request(NODE_TYPE_FEED, feed_url, NODE_TYPE_WEBSITE, link, LINK_TYPE_FROM_FEED, r.Depth+1)
+	}
+
+	c.CollectRssItems(r, channel)
+}
+
+func (c *Crawler) CollectRssItems(r *colly.Request, channel *xmlquery.Node) {
+	// TODO: change collect depth
+	if r.Depth > 2 {
+		return
+	}
+	if c.Config.MaxPostsPerFeed < 1 {
+		return
+	}
+
+	posts := []*PostFrontmatter{}
+	xmlItems := xmlquery.Find(channel, "//item")
+	for _, item := range xmlItems {
+		post, ok := c.OnXML_RssItem(r, item)
+		if ok {
+			posts = append(posts, post)
+		}
+	}
+
+	slices.SortFunc(posts, func(a, b *PostFrontmatter) int {
+		return cmp.Compare(a.Date, b.Date)
+	})
+
+	for i, post := range posts {
+		if i < c.Config.MaxPostsPerFeed {
+			c.SavePost(post)
 		}
 	}
 }
 
-func (c *Crawler) OnXML_RssItem(r *colly.Request, item *xmlquery.Node) {
+func (c *Crawler) OnXML_RssItem(r *colly.Request, item *xmlquery.Node) (*PostFrontmatter, bool) {
 	feed_url := r.URL.String()
-
-	if r.Depth > 2 {
-		return
-	}
 
 	post_id := xmlText(item, "guid")
 	link := xmlText(item, "link")
@@ -85,6 +112,7 @@ func (c *Crawler) OnXML_RssItem(r *colly.Request, item *xmlquery.Node) {
 	description := xmlText(item, "description")
 	date := xmlText(item, "pubDate")
 	content := xmlText(item, "content")
+	categories := xmlTextMultiple(item, "category")
 
 	post := NewPostFrontmatter(post_id, link)
 	post.WithTitle(title)
@@ -92,28 +120,30 @@ func (c *Crawler) OnXML_RssItem(r *colly.Request, item *xmlquery.Node) {
 	post.WithDate(date)
 	post.WithContent(content)
 	post.WithFeedLink(feed_url)
+	post.WithCategories(categories)
 
+	if title == "" {
+		return nil, false
+	}
 	if blocked, domain := isBlockedDomain(link, c.Config); blocked {
 		log.Printf("Domain is blocked: %s", domain)
-		return
+		return nil, false
 	}
 	if blocked, blockWord := hasBlockWords(title, c.Config); blocked {
 		log.Printf("Word in title is blocked: %s", blockWord)
-		return
+		return nil, false
 	}
 	if blocked, blockWord := hasBlockWords(description, c.Config); blocked {
 		log.Printf("Word in description is blocked: %s", blockWord)
-		return
+		return nil, false
 	}
 	if blocked, blockWord := hasBlockWords(content, c.Config); blocked {
 		log.Printf("Word in content is blocked: %s", blockWord)
-		return
+		return nil, false
 	}
 	if isBlockedPost(link, title, post.Params.Id, c.Config) {
-		return
+		return nil, false
 	}
 
-	if title != "" {
-		post.Save(c.Config)
-	}
+	return post, true
 }

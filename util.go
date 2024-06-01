@@ -3,11 +3,9 @@ package main
 import (
 	"crypto/md5"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"github.com/go-yaml/yaml"
 	"log"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -52,7 +50,11 @@ func truncateText(s string, max int) string {
 	if max > len(s) {
 		return s
 	}
-	return s[:strings.LastIndexAny(s[:max], " .,:;-")]
+	idx := strings.LastIndexAny(s[:max], " .,:;-")
+	if idx < 0 {
+		idx = max
+	}
+	return s[:idx]
 }
 
 func panicf(f string, a ...any) {
@@ -136,21 +138,19 @@ func cleanupContentOutputDirs(config *ParsedConfig) {
 	mkdirIfNotExists(config.FollowingFolderName)
 	mkdirIfNotExists(config.DiscoverFolderName)
 	mkdirIfNotExists(config.NetworkFolderName)
-	rmGenerated(POST_PREFIX, config.ReadingFolderName)
-	rmGenerated(FEED_PREFIX, config.FollowingFolderName)
-	rmGenerated(FEED_PREFIX, config.DiscoverFolderName)
-	rmGenerated(LINK_PREFIX, config.NetworkFolderName)
+	if config.RemoveOldContent {
+		rmGenerated(POST_PREFIX, config.ReadingFolderName)
+		rmGenerated(FEED_PREFIX, config.FollowingFolderName)
+		rmGenerated(FEED_PREFIX, config.DiscoverFolderName)
+		rmGenerated(LINK_PREFIX, config.NetworkFolderName)
+	}
 }
 
-func buildRecommendationUrl(u string) (string, error) {
-	parsed, err := url.Parse(u)
-	if err != nil {
-		return "", err
+func ContainsAnyString(search string, targets []string) bool {
+	for _, target := range targets {
+		if strings.Contains(search, target) {
+			return true
+		}
 	}
-	host := parsed.Host
-	scheme := parsed.Scheme
-	if scheme != "http" && scheme != "https" {
-		return "", errors.New(fmt.Sprintf("Unsupported scheme: %s", scheme))
-	}
-	return fmt.Sprintf("%s://%s%s", scheme, host, WELL_KNOWN_RECOMMENDATIONS_OPML), nil
+	return false
 }

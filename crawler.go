@@ -6,10 +6,12 @@ import (
 	"github.com/antchfx/xpath"
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/queue"
+	"github.com/goware/urlx"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
+	"slices"
+	"strings"
 )
 
 type Crawler struct {
@@ -17,6 +19,7 @@ type Crawler struct {
 	Config                     *ParsedConfig
 	Queue                      *queue.Queue
 	BlogrollWithNamespaceXPath *xpath.Expr
+	db                         *DB
 }
 
 func OnErrorHandler(resp *colly.Response, err error) {
@@ -26,23 +29,52 @@ func OnErrorHandler(resp *colly.Response, err error) {
 func OnRequestHandler(r *colly.Request) {
 	url := r.URL.String()
 	log.Printf("Processing request: %s", url)
+	r.Headers.Set("Referer", REFERER_STRING)
 }
 
-func (c *Crawler) Crawl(urls ...string) error {
+func (c *Crawler) Crawl(urls ...string) {
 	for _, url := range urls {
 		c.Collector.Visit(url)
 	}
-	return c.Queue.Run(c.Collector)
+	err := c.Queue.Run(c.Collector)
+	if err != nil {
+		panicf("Config decode error: %e", err)
+	}
 }
 
-func (c *Crawler) Request(recommender_type NodeType, recommender string, target_type NodeType, target string, depth int) {
-	parsed, err := url.Parse(target)
+func (c *Crawler) PurgeNoIndex() {
+	c.db.DeleteNoIndexLinks()
+}
+
+func (c *Crawler) Request(recommender_type NodeType, recommender string, target_type NodeType, target string, link_type string, depth int) {
+	// Common parsing issue
+	if strings.HasPrefix(target, "mailto:") {
+		return
+	}
+
+	parsed, err := urlx.Parse(target)
 	if err != nil {
 		return
 	}
 
+	// Upgrade HTTP to HTTPS
+	if parsed.Scheme == "http" && !slices.Contains(c.Config.HttpOnlyHosts, parsed.Host) {
+		parsed.Scheme = "https"
+	}
+
+	// Normalize
+	if parsed.Path == "" {
+		parsed.Path = "/"
+	}
+
+	// prevent file:// and other schemes
 	if parsed.Scheme == "http" && parsed.Scheme == "https" {
-		// prevent file:// and other schemes
+		return
+	}
+
+	// Normalize URL
+	target, err = urlx.Normalize(parsed)
+	if err != nil {
 		return
 	}
 
@@ -51,15 +83,9 @@ func (c *Crawler) Request(recommender_type NodeType, recommender string, target_
 		return
 	}
 
-	if target_type == NODE_TYPE_BLOGROLL {
-		// Special case:
-		// When we find a website we guess that it may have a blogroll at the well-known
-		// URL. But we don't want to track it until we load it
-	} else {
-		// Others are tracked immediately as someone thought the URL was valid enough
-		// to link to it.
-		NewLinkFrontmatter(recommender_type, recommender, target_type, target).Save(c.Config)
-	}
+	// Record a link between the recommender URL and this one
+	link := NewLinkFrontmatter(recommender_type, recommender, target_type, target, link_type)
+	c.SaveLink(link)
 
 	ctx := colly.NewContext()
 	ctx.Put("rec", recommender)
@@ -74,28 +100,6 @@ func (c *Crawler) Request(recommender_type NodeType, recommender string, target_
 	c.Queue.AddRequest(r)
 }
 
-func (c *Crawler) SaveFrontmatter(request *colly.Request) {
-	url := request.URL.String()
-	recommender := request.Ctx.Get("rec")
-	ctx_recommender_type := request.Ctx.GetAny("rec_type")
-	ctx_target_type := request.Ctx.GetAny("target_type")
-
-	recommender_type := NODE_TYPE_SEED
-	if ctx_recommender_type != nil {
-		recommender_type = ctx_recommender_type.(NodeType)
-	}
-	target_type := NODE_TYPE_FEED
-	if ctx_target_type != nil {
-		target_type = ctx_target_type.(NodeType)
-	}
-
-	if url == "" || recommender == "" {
-		return
-	}
-
-	NewLinkFrontmatter(recommender_type, recommender, target_type, url).Save(c.Config)
-}
-
 func processXmlQuery(r *colly.Request, xpathStr string, nav *xmlquery.Node, callback func(*colly.Request, *xmlquery.Node)) {
 	foundNodes := xmlquery.Find(nav, xpathStr)
 	for _, found := range foundNodes {
@@ -105,8 +109,18 @@ func processXmlQuery(r *colly.Request, xpathStr string, nav *xmlquery.Node, call
 
 func (c *Crawler) OnResponseHandler(resp *colly.Response) {
 	r := resp.Request
+	page_url := r.URL.String()
 	if resp.StatusCode != 200 {
 		return
+	}
+
+	if resp.Headers != nil {
+		for _, headerVal := range resp.Headers.Values("X-Robots-Tag") {
+			if ContainsAnyString(headerVal, META_ROBOT_NOINDEX_VARIANTS) {
+				c.db.TrackNoIndex(page_url)
+				return
+			}
+		}
 	}
 
 	opts := xmlquery.ParserOptions{
@@ -120,17 +134,15 @@ func (c *Crawler) OnResponseHandler(resp *colly.Response) {
 		return
 	}
 
-	processXmlQuery(r, "/opml/body", doc, c.OnXML_OpmlBody)
 	processXmlQuery(r, "/opml/body//outline", doc, c.OnXML_OpmlOutline)
 	processXmlQuery(r, "/rss/channel", doc, c.OnXML_RssChannel)
-	processXmlQuery(r, "/rss/channel/item", doc, c.OnXML_RssItem)
 	processXmlQuery(r, "/feed", doc, c.OnXML_AtomFeed)
-	processXmlQuery(r, "/feed/entry", doc, c.OnXML_AtomEntry)
 }
 
 func NewCrawler(config *ParsedConfig) Crawler {
 	crawler := Crawler{}
 	crawler.Config = config
+	crawler.db = NewDB()
 
 	var err error
 	nsMap := map[string]string{
@@ -155,6 +167,9 @@ func NewCrawler(config *ParsedConfig) Crawler {
 	t.RegisterProtocol("file", http.NewFileTransport(http.Dir(workingDir)))
 	crawler.Collector.WithTransport(t)
 	crawler.Collector.DisableCookies()
+	if config.HttpProxyURL != nil {
+		crawler.Collector.SetProxy(*config.HttpProxyURL)
+	}
 
 	crawler.Collector.IgnoreRobotsTxt = false
 	if config.RequestTimeout != nil {
@@ -167,7 +182,7 @@ func NewCrawler(config *ParsedConfig) Crawler {
 	crawler.Collector.OnResponse(crawler.OnResponseHandler)
 
 	// HTML pages
-	crawler.Collector.OnHTML("link[rel='blogroll']", crawler.OnHTML_RelLink)
+	crawler.Collector.OnHTML("html", crawler.OnHTML)
 
 	crawler.Queue, err = queue.New(
 		config.CrawlThreads,
@@ -178,4 +193,40 @@ func NewCrawler(config *ParsedConfig) Crawler {
 	}
 
 	return crawler
+}
+
+func (c *Crawler) SaveLink(f *LinkFrontmatter) {
+	if slices.Contains(c.Config.OutputModes, OUTPUT_MODE_HUGO_CONTENT) {
+		id := buildLinkId(f.Params.SourceURL, f.Params.DestinationURL)
+		path := generatedFilePath(c.Config.NetworkFolderName, LINK_PREFIX, id)
+		writeYaml(f, path)
+	}
+	if slices.Contains(c.Config.OutputModes, OUTPUT_MODE_SQL) {
+		c.db.TrackLink(f)
+	}
+}
+
+func (c *Crawler) SaveFeed(f *FeedFrontmatter, isDirect bool) {
+	if slices.Contains(c.Config.OutputModes, OUTPUT_MODE_HUGO_CONTENT) {
+		var path string
+		if isDirect {
+			path = generatedFilePath(c.Config.FollowingFolderName, FEED_PREFIX, f.Params.Id)
+		} else {
+			path = generatedFilePath(c.Config.DiscoverFolderName, FEED_PREFIX, f.Params.Id)
+		}
+		writeYaml(f, path)
+	}
+	if slices.Contains(c.Config.OutputModes, OUTPUT_MODE_SQL) {
+		c.db.TrackFeed(f)
+	}
+}
+
+func (c *Crawler) SavePost(f *PostFrontmatter) {
+	if slices.Contains(c.Config.OutputModes, OUTPUT_MODE_HUGO_CONTENT) {
+		path := generatedFilePath(c.Config.ReadingFolderName, POST_PREFIX, f.Params.Id)
+		writeYaml(f, path)
+	}
+	if slices.Contains(c.Config.OutputModes, OUTPUT_MODE_SQL) {
+		c.db.TrackPost(f)
+	}
 }

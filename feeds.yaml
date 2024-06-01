@@ -2,3 +2,10 @@ feed_urls:
   - http://localhost:8000/initial.opml
 discover_depth: 100
 crawl_threads: 1
+
+output_mode:
+  - "SQL"
+  - "HugoContent"
+
+http_only_hosts:
+  - "localhost:8000"
