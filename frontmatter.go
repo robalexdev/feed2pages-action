@@ -1,5 +1,9 @@
 package main
 
+import (
+	"strings"
+)
+
 // https://gohugo.io/content-management/front-matter/
 type PostFrontmatter struct {
 	Date        string     `yaml:"date"`
@@ -28,7 +32,13 @@ func (f *PostFrontmatter) WithTitle(title string) {
 }
 
 func (f *PostFrontmatter) WithCategories(cats []string) {
-	f.Params.Categories = append(f.Params.Categories, cats...)
+	for _, cat := range cats {
+		cat = strings.TrimSpace(cat)
+		if len(cat) == 0 {
+			continue
+		}
+		f.Params.Categories = append(f.Params.Categories, cat)
+	}
 }
 
 func (f *PostFrontmatter) WithDescription(description string) {
@@ -91,7 +101,13 @@ func (f *FeedFrontmatter) WithFeedType(feedType string) {
 }
 
 func (f *FeedFrontmatter) WithCategories(cats []string) {
-	f.Params.Categories = append(f.Params.Categories, cats...)
+	for _, cat := range cats {
+		cat = strings.TrimSpace(cat)
+		if len(cat) == 0 {
+			continue
+		}
+		f.Params.Categories = append(f.Params.Categories, cat)
+	}
 }
 
 func (f *FeedFrontmatter) WithBlogRolls(links []string) {
