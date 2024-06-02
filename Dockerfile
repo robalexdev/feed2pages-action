@@ -7,7 +7,7 @@ COPY go.mod go.sum .
 RUN go mod download
 
 COPY . /util
-RUN CGO_ENABLED=0 go build -v -o util .
+RUN CGO_ENABLED=1 go build -v -o util .
 
 FROM gcr.io/distroless/static
 COPY --from=builder /util/util /util
