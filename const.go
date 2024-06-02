@@ -79,3 +79,5 @@ var META_ROBOT_NOFOLLOW_VARIANTS = []string{
 }
 
 const REFERER_STRING = "https://alexsci.com/rss-blogroll-network/"
+
+const OLD_DATE_RFC3339 = "1970-01-01T00:00:00Z"

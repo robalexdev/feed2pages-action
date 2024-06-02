@@ -13,13 +13,15 @@ func (c *Crawler) OnXML_AtomFeed(r *colly.Request, channel *xmlquery.Node) {
 	links := collectLinkHrefs(r, "link[@rel='alternate']", channel)
 	title := xmlText(channel, "title")
 	description := xmlText(channel, "subtitle")
-	date := xmlText(channel, "updated")
+	date := fmtDate(xmlText(channel, "updated"))
+	categories := xmlPathAttrMultiple(channel, "category", "term")
 
 	feed := NewFeedFrontmatter(feed_url)
 	feed.WithDate(date)
 	feed.WithTitle(title)
 	feed.WithFeedType("atom")
 	feed.WithDescription(description)
+	feed.WithCategories(categories)
 
 	if blocked, blockWord := hasBlockWords(title, c.Config); blocked {
 		log.Printf("Word in title is blocked: %s", blockWord)
@@ -56,8 +58,7 @@ func (c *Crawler) OnXML_AtomFeed(r *colly.Request, channel *xmlquery.Node) {
 }
 
 func (c *Crawler) CollectAtomEntries(r *colly.Request, channel *xmlquery.Node) {
-	// TODO: change collect depth
-	if r.Depth > 2 {
+	if r.Depth > c.Config.PostCollectionDepth {
 		return
 	}
 	if c.Config.MaxPostsPerFeed < 1 {
@@ -74,7 +75,8 @@ func (c *Crawler) CollectAtomEntries(r *colly.Request, channel *xmlquery.Node) {
 	}
 
 	slices.SortFunc(posts, func(a, b *PostFrontmatter) int {
-		return cmp.Compare(a.Date, b.Date)
+		// Reverse chronological
+		return cmp.Compare(b.Date, a.Date)
 	})
 
 	for i, post := range posts {
@@ -95,7 +97,7 @@ func (c *Crawler) OnXML_AtomEntry(r *colly.Request, entry *xmlquery.Node) ([]*Po
 	}
 
 	title := xmlText(entry, "title")
-	date := xmlText(entry, "updated")
+	date := fmtDate(xmlText(entry, "published"))
 	content := xmlText(entry, "content")
 	categories := xmlPathAttrMultiple(entry, "category", "term")
 

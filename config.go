@@ -33,6 +33,7 @@ type Config struct {
 
 	// Discovery of recommended feeds
 	DiscoverDepth             *int `yaml:"discover_depth"`
+	PostCollectionDepth       *int `yaml:"post_collection_depth"`
 	MaxRecommendationsPerFeed *int `yaml:"max_recommendations_per_feed"`
 	MaxRecommendations        *int `yaml:"max_recommendations"`
 
@@ -125,6 +126,7 @@ func (c *Config) Parse() *ParsedConfig {
 	out.MaxPosts = intDefault(c.MaxPosts, 1000)
 	out.MaxPostsPerFeed = intDefault(c.MaxPostsPerFeed, 100)
 	out.DiscoverDepth = intDefault(c.DiscoverDepth, 4)
+	out.PostCollectionDepth = intDefault(c.PostCollectionDepth, 2)
 	out.MaxRecommendations = intDefault(c.MaxRecommendations, 1000)
 	out.MaxRecommendationsPerFeed = intDefault(c.MaxRecommendationsPerFeed, 100)
 
@@ -170,6 +172,7 @@ type ParsedConfig struct {
 	MaxPosts                  int
 	MaxPostsPerFeed           int
 	DiscoverDepth             int
+	PostCollectionDepth       int
 	MaxRecommendations        int
 	MaxRecommendationsPerFeed int
 

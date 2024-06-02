@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 func mkdirIfNotExists(path string) {
@@ -153,4 +154,12 @@ func ContainsAnyString(search string, targets []string) bool {
 		}
 	}
 	return false
+}
+
+func fmtDate(in string) string {
+	t, err := ParseDate(in)
+	if err != nil {
+		return OLD_DATE_RFC3339
+	}
+	return t.Format(time.RFC3339)
 }

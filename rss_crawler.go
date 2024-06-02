@@ -14,7 +14,7 @@ func (c *Crawler) OnXML_RssChannel(r *colly.Request, channel *xmlquery.Node) {
 	link := xmlText(channel, "link")
 	title := xmlText(channel, "title")
 	description := xmlText(channel, "description")
-	date := xmlText(channel, "pubDate")
+	date := fmtDate(xmlText(channel, "pubDate"))
 	categories := xmlTextMultiple(channel, "category")
 
 	// First try a namespace aware query for blogroll
@@ -75,8 +75,7 @@ func (c *Crawler) OnXML_RssChannel(r *colly.Request, channel *xmlquery.Node) {
 }
 
 func (c *Crawler) CollectRssItems(r *colly.Request, channel *xmlquery.Node) {
-	// TODO: change collect depth
-	if r.Depth > 2 {
+	if r.Depth > c.Config.PostCollectionDepth {
 		return
 	}
 	if c.Config.MaxPostsPerFeed < 1 {
@@ -93,7 +92,8 @@ func (c *Crawler) CollectRssItems(r *colly.Request, channel *xmlquery.Node) {
 	}
 
 	slices.SortFunc(posts, func(a, b *PostFrontmatter) int {
-		return cmp.Compare(a.Date, b.Date)
+		// Reverse chronological
+		return cmp.Compare(b.Date, a.Date)
 	})
 
 	for i, post := range posts {
@@ -110,7 +110,7 @@ func (c *Crawler) OnXML_RssItem(r *colly.Request, item *xmlquery.Node) (*PostFro
 	link := xmlText(item, "link")
 	title := xmlText(item, "title")
 	description := xmlText(item, "description")
-	date := xmlText(item, "pubDate")
+	date := fmtDate(xmlText(item, "pubDate"))
 	content := xmlText(item, "content")
 	categories := xmlTextMultiple(item, "category")
 
