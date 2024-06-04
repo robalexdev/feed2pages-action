@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/antchfx/xmlquery"
 	"github.com/antchfx/xpath"
 	"github.com/gocolly/colly/v2"
@@ -13,7 +12,6 @@ import (
 	"os"
 	"slices"
 	"strings"
-	"time"
 )
 
 type Crawler struct {
