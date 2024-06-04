@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/antchfx/xmlquery"
+	"github.com/antchfx/xpath"
 	"github.com/gocolly/colly/v2"
 	"strings"
 )
@@ -16,6 +17,18 @@ func xmlText(node *xmlquery.Node, xpathStr string) string {
 
 func xmlTextMultiple(node *xmlquery.Node, xpathStr string) []string {
 	found := xmlquery.Find(node, xpathStr)
+	if len(found) < 1 {
+		return []string{}
+	}
+	res := []string{}
+	for _, node := range found {
+		res = append(res, node.InnerText())
+	}
+	return res
+}
+
+func xmlTextMultipleWithNamespace(node *xmlquery.Node, xpath *xpath.Expr) []string {
+	found := xmlquery.QuerySelectorAll(node, xpath)
 	if len(found) < 1 {
 		return []string{}
 	}

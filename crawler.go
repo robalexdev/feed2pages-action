@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/antchfx/xmlquery"
 	"github.com/antchfx/xpath"
 	"github.com/gocolly/colly/v2"
@@ -12,14 +13,16 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"time"
 )
 
 type Crawler struct {
-	Collector                  *colly.Collector
-	Config                     *ParsedConfig
-	Queue                      *queue.Queue
-	BlogrollWithNamespaceXPath *xpath.Expr
-	db                         *DB
+	Collector                        *colly.Collector
+	Config                           *ParsedConfig
+	Queue                            *queue.Queue
+	BlogrollWithNamespaceXPath       *xpath.Expr
+	ITunesCategoryWithNamespaceXPath *xpath.Expr
+	db                               *DB
 }
 
 func OnErrorHandler(resp *colly.Response, err error) {
@@ -147,8 +150,14 @@ func NewCrawler(config *ParsedConfig) Crawler {
 	var err error
 	nsMap := map[string]string{
 		"source": "http://source.scripting.com/",
+		"itunes": "http://www.itunes.com/dtds/podcast-1.0.dtd",
 	}
 	crawler.BlogrollWithNamespaceXPath, err = xpath.CompileWithNS("source:blogroll", nsMap)
+	if err != nil {
+		panic(err)
+	}
+
+	crawler.ITunesCategoryWithNamespaceXPath, err = xpath.CompileWithNS("itunes:category", nsMap)
 	if err != nil {
 		panic(err)
 	}
@@ -162,6 +171,7 @@ func NewCrawler(config *ParsedConfig) Crawler {
 		colly.MaxDepth(config.DiscoverDepth),
 		colly.UserAgent(USER_AGENT),
 	)
+	crawler.Collector.CacheDir = "./cache"
 
 	t := config.BuildTransport()
 	t.RegisterProtocol("file", http.NewFileTransport(http.Dir(workingDir)))

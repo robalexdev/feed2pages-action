@@ -65,6 +65,7 @@ type FeedFrontmatter struct {
 }
 
 type FeedParams struct {
+	IsPodcast  bool     `yaml:"ispodcast"`
 	FeedLink   string   `yaml:"feedlink"`
 	Id         string   `yaml:"id"`
 	Link       string   `yaml:"link"`
@@ -98,6 +99,10 @@ func (f *FeedFrontmatter) WithLink(link string) {
 
 func (f *FeedFrontmatter) WithFeedType(feedType string) {
 	f.Params.FeedType = feedType
+}
+
+func (f *FeedFrontmatter) IsPodcast(isPodcast bool) {
+	f.Params.IsPodcast = isPodcast
 }
 
 func (f *FeedFrontmatter) WithCategories(cats []string) {

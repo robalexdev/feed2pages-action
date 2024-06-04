@@ -9,13 +9,22 @@ import (
 )
 
 func (c *Crawler) OnXML_RssChannel(r *colly.Request, channel *xmlquery.Node) {
+	isPodcast := false
 	feed_url := r.URL.String()
 
 	link := xmlText(channel, "link")
 	title := xmlText(channel, "title")
 	description := xmlText(channel, "description")
 	date := fmtDate(xmlText(channel, "pubDate"))
-	categories := xmlTextMultiple(channel, "category")
+
+	// Podcasts may use iTunes categories
+	categories := xmlTextMultipleWithNamespace(channel, c.ITunesCategoryWithNamespaceXPath)
+	if len(categories) > 0 {
+		// iTunes requires this for a podcast to be listed
+		isPodcast = true
+	} else {
+		categories = xmlTextMultiple(channel, "category")
+	}
 
 	// First try a namespace aware query for blogroll
 	blogrolls := xmlquery.QuerySelectorAll(channel, c.BlogrollWithNamespaceXPath)
@@ -38,6 +47,7 @@ func (c *Crawler) OnXML_RssChannel(r *colly.Request, channel *xmlquery.Node) {
 	feed.WithFeedType("rss")
 	feed.WithBlogRolls(blogrollUrls)
 	feed.WithCategories(categories)
+	feed.IsPodcast(isPodcast)
 
 	if blocked, domain := isBlockedDomain(link, c.Config); blocked {
 		log.Printf("Domain is blocked: %s", domain)
