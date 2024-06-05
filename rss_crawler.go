@@ -18,7 +18,7 @@ func (c *Crawler) OnXML_RssChannel(r *colly.Request, channel *xmlquery.Node) {
 	date := fmtDate(xmlText(channel, "pubDate"))
 
 	// Podcasts may use iTunes categories
-	categories := xmlTextMultipleWithNamespace(channel, c.ITunesCategoryWithNamespaceXPath)
+	categories := xmlPathAttrMultipleWithNamespace(channel, c.ITunesCategoryWithNamespaceXPath, "text")
 	if len(categories) > 0 {
 		// iTunes requires this for a podcast to be listed
 		isPodcast = true

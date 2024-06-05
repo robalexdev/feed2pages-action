@@ -27,14 +27,14 @@ func xmlTextMultiple(node *xmlquery.Node, xpathStr string) []string {
 	return res
 }
 
-func xmlTextMultipleWithNamespace(node *xmlquery.Node, xpath *xpath.Expr) []string {
+func xmlPathAttrMultipleWithNamespace(node *xmlquery.Node, xpath *xpath.Expr, attrName string) []string {
 	found := xmlquery.QuerySelectorAll(node, xpath)
 	if len(found) < 1 {
 		return []string{}
 	}
 	res := []string{}
 	for _, node := range found {
-		res = append(res, node.InnerText())
+		res = append(res, strings.TrimSpace(node.SelectAttr(attrName)))
 	}
 	return res
 }
