@@ -5,10 +5,12 @@ import (
 	"github.com/antchfx/xmlquery"
 	"github.com/gocolly/colly/v2"
 	"log"
+	"net/http"
 	"slices"
+	"strings"
 )
 
-func (c *Crawler) OnXML_AtomFeed(r *colly.Request, channel *xmlquery.Node) {
+func (c *Crawler) OnXML_AtomFeed(headers *http.Header, r *colly.Request, channel *xmlquery.Node) {
 	feed_url := r.URL.String()
 	links := collectLinkHrefs(r, "link[@rel='alternate']", channel)
 	title := xmlText(channel, "title")
@@ -22,6 +24,7 @@ func (c *Crawler) OnXML_AtomFeed(r *colly.Request, channel *xmlquery.Node) {
 	feed.WithFeedType("atom")
 	feed.WithDescription(description)
 	feed.WithCategories(categories)
+	setNoArchive(feed, headers)
 
 	if blocked, blockWord := hasBlockWords(title, c.Config); blocked {
 		log.Printf("Word in title is blocked: %s", blockWord)
@@ -97,7 +100,14 @@ func (c *Crawler) OnXML_AtomEntry(r *colly.Request, entry *xmlquery.Node) ([]*Po
 	}
 
 	title := xmlText(entry, "title")
-	date := fmtDate(xmlText(entry, "published"))
+
+	// Whatever date we can find
+	dateStr := xmlText(entry, "updated")
+	if dateStr == "" {
+		dateStr = xmlText(entry, "published")
+	}
+	date := fmtDate(dateStr)
+
 	content := xmlText(entry, "content")
 	categories := xmlPathAttrMultiple(entry, "category", "term")
 
@@ -123,7 +133,17 @@ func (c *Crawler) OnXML_AtomEntry(r *colly.Request, entry *xmlquery.Node) ([]*Po
 
 	found := []*PostFrontmatter{}
 	for _, link := range links {
-		post := NewPostFrontmatter(post_id, link)
+		if strings.HasPrefix(link, "/") {
+			// This is a relative URL which are not well supported by readers
+			continue
+		}
+		lowLink := strings.ToLower(link)
+		if (!strings.HasPrefix(lowLink, "http://")) && (!strings.HasPrefix(lowLink, "https://")) {
+			// This isn't a web link
+			continue
+		}
+
+		post := NewPostFrontmatter(feed_url, post_id, link)
 		post.WithTitle(title)
 		post.WithDescription(description)
 		post.WithDate(date)

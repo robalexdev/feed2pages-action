@@ -23,8 +23,24 @@ type Crawler struct {
 	db                               *DB
 }
 
-func OnErrorHandler(resp *colly.Response, err error) {
-	log.Printf("Crawl error: %s, %v", resp.Request.URL, err)
+func (c *Crawler) OnErrorHandler(resp *colly.Response, err error) {
+	// Don't index certain HTTP error responses
+	noIndexStatusCodes := []int{
+		401, // Unauthorized
+		403, // Forbidden
+		404, // Not found
+		405, // Method not allowed
+		407, // Proxy auth. req.
+		410, // Gone
+	}
+	for code := range noIndexStatusCodes {
+		if resp.StatusCode == code {
+			c.db.TrackNoIndex(resp.Request.URL.String())
+			break
+		}
+	}
+
+	log.Printf("Crawl error: %s, %v %v", resp.Request.URL, resp.StatusCode, err)
 }
 
 func OnRequestHandler(r *colly.Request) {
@@ -101,10 +117,10 @@ func (c *Crawler) Request(recommender_type NodeType, recommender string, target_
 	c.Queue.AddRequest(r)
 }
 
-func processXmlQuery(r *colly.Request, xpathStr string, nav *xmlquery.Node, callback func(*colly.Request, *xmlquery.Node)) {
+func processXmlQuery(headers *http.Header, r *colly.Request, xpathStr string, nav *xmlquery.Node, callback func(*http.Header, *colly.Request, *xmlquery.Node)) {
 	foundNodes := xmlquery.Find(nav, xpathStr)
 	for _, found := range foundNodes {
-		callback(r, found)
+		callback(headers, r, found)
 	}
 }
 
@@ -115,7 +131,8 @@ func (c *Crawler) OnResponseHandler(resp *colly.Response) {
 		return
 	}
 
-	if resp.Headers != nil {
+	headers := resp.Headers
+	if headers != nil {
 		for _, headerVal := range resp.Headers.Values("X-Robots-Tag") {
 			if ContainsAnyString(headerVal, META_ROBOT_NOINDEX_VARIANTS) {
 				c.db.TrackNoIndex(page_url)
@@ -135,9 +152,9 @@ func (c *Crawler) OnResponseHandler(resp *colly.Response) {
 		return
 	}
 
-	processXmlQuery(r, "/opml/body//outline", doc, c.OnXML_OpmlOutline)
-	processXmlQuery(r, "/rss/channel", doc, c.OnXML_RssChannel)
-	processXmlQuery(r, "/feed", doc, c.OnXML_AtomFeed)
+	processXmlQuery(headers, r, "/opml/body//outline", doc, c.OnXML_OpmlOutline)
+	processXmlQuery(headers, r, "/rss/channel", doc, c.OnXML_RssChannel)
+	processXmlQuery(headers, r, "/feed", doc, c.OnXML_AtomFeed)
 }
 
 func NewCrawler(config *ParsedConfig) Crawler {
@@ -184,7 +201,7 @@ func NewCrawler(config *ParsedConfig) Crawler {
 		crawler.Collector.SetRequestTimeout(*config.RequestTimeout)
 	}
 	crawler.Collector.OnRequest(OnRequestHandler)
-	crawler.Collector.OnError(OnErrorHandler)
+	crawler.Collector.OnError(crawler.OnErrorHandler)
 
 	// XML handled here: OPML, RSS, Atom
 	crawler.Collector.OnResponse(crawler.OnResponseHandler)

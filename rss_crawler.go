@@ -5,10 +5,12 @@ import (
 	"github.com/antchfx/xmlquery"
 	"github.com/gocolly/colly/v2"
 	"log"
+	"net/http"
 	"slices"
+	"strings"
 )
 
-func (c *Crawler) OnXML_RssChannel(r *colly.Request, channel *xmlquery.Node) {
+func (c *Crawler) OnXML_RssChannel(headers *http.Header, r *colly.Request, channel *xmlquery.Node) {
 	isPodcast := false
 	feed_url := r.URL.String()
 
@@ -48,6 +50,7 @@ func (c *Crawler) OnXML_RssChannel(r *colly.Request, channel *xmlquery.Node) {
 	feed.WithBlogRolls(blogrollUrls)
 	feed.WithCategories(categories)
 	feed.IsPodcast(isPodcast)
+	setNoArchive(feed, headers)
 
 	if blocked, domain := isBlockedDomain(link, c.Config); blocked {
 		log.Printf("Domain is blocked: %s", domain)
@@ -124,7 +127,7 @@ func (c *Crawler) OnXML_RssItem(r *colly.Request, item *xmlquery.Node) (*PostFro
 	content := xmlText(item, "content")
 	categories := xmlTextMultiple(item, "category")
 
-	post := NewPostFrontmatter(post_id, link)
+	post := NewPostFrontmatter(feed_url, post_id, link)
 	post.WithTitle(title)
 	post.WithDescription(description)
 	post.WithDate(date)
@@ -152,6 +155,15 @@ func (c *Crawler) OnXML_RssItem(r *colly.Request, item *xmlquery.Node) (*PostFro
 		return nil, false
 	}
 	if isBlockedPost(link, title, post.Params.Id, c.Config) {
+		return nil, false
+	}
+	if strings.HasPrefix(link, "/") {
+		// This is a relative URL which are not well supported by readers
+		return nil, false
+	}
+	lowLink := strings.ToLower(link)
+	if (!strings.HasPrefix(lowLink, "http://")) && (!strings.HasPrefix(lowLink, "https://")) {
+		// This isn't a web link
 		return nil, false
 	}
 

@@ -6,11 +6,25 @@ import (
 	"fmt"
 	"github.com/go-yaml/yaml"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 )
+
+func setNoArchive(feed *FeedFrontmatter, headers *http.Header) {
+	isNoarchive := false
+	if headers != nil {
+		for _, headerVal := range headers.Values("X-Robots-Tag") {
+			if ContainsAnyString(headerVal, META_ROBOT_NOARCHIVE_VARIANTS) {
+				isNoarchive = true
+				break
+			}
+		}
+	}
+	feed.IsNoarchive(isNoarchive)
+}
 
 func mkdirIfNotExists(path string) {
 	err := os.MkdirAll(path, 0755)
@@ -127,6 +141,11 @@ func buildSafeId(id, link string) string {
 		id = md5Hex(id)
 	}
 	return id
+}
+
+func buildSafePostId(feed_link, guid string) string {
+	// Here we trust that the post ID is unique enough on a per-site basis
+	return md5Hex(guid + " " + feed_link)
 }
 
 func md5Hex(s string) string {

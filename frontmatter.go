@@ -20,9 +20,9 @@ type PostParams struct {
 	Categories []string `yaml:"categories"`
 }
 
-func NewPostFrontmatter(guid, link string) *PostFrontmatter {
+func NewPostFrontmatter(feed_url, guid, link string) *PostFrontmatter {
 	out := new(PostFrontmatter)
-	out.Params.Id = buildSafeId(guid, link)
+	out.Params.Id = buildSafePostId(feed_url, guid)
 	out.Params.Link = link
 	return out
 }
@@ -65,13 +65,14 @@ type FeedFrontmatter struct {
 }
 
 type FeedParams struct {
-	IsPodcast  bool     `yaml:"ispodcast"`
-	FeedLink   string   `yaml:"feedlink"`
-	Id         string   `yaml:"id"`
-	Link       string   `yaml:"link"`
-	BlogRolls  []string `yaml:"blogrolls"`
-	FeedType   string   `yaml:"feedtype"`
-	Categories []string `yaml:"categories"`
+	IsPodcast   bool     `yaml:"ispodcast"`
+	IsNoarchive bool     `yaml:"isnoarchive"`
+	FeedLink    string   `yaml:"feedlink"`
+	Id          string   `yaml:"id"`
+	Link        string   `yaml:"link"`
+	BlogRolls   []string `yaml:"blogrolls"`
+	FeedType    string   `yaml:"feedtype"`
+	Categories  []string `yaml:"categories"`
 }
 
 func NewFeedFrontmatter(feed_url string) *FeedFrontmatter {
@@ -99,6 +100,10 @@ func (f *FeedFrontmatter) WithLink(link string) {
 
 func (f *FeedFrontmatter) WithFeedType(feedType string) {
 	f.Params.FeedType = feedType
+}
+
+func (f *FeedFrontmatter) IsNoarchive(isNoarchive bool) {
+	f.Params.IsNoarchive = isNoarchive
 }
 
 func (f *FeedFrontmatter) IsPodcast(isPodcast bool) {

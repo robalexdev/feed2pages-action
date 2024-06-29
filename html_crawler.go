@@ -26,8 +26,8 @@ func (c *Crawler) OnHTML(element *colly.HTMLElement) {
 		content := single.AttrOr("content", "")
 		if ContainsAnyString(content, META_ROBOT_NOINDEX_VARIANTS) {
 			// Respect noindex
+			log.Printf("NOINDEX: %s\n", page_url)
 			c.db.TrackNoIndex(page_url)
-			return
 		}
 		if ContainsAnyString(content, META_ROBOT_NOFOLLOW_VARIANTS) {
 			isNofollow = true
@@ -79,11 +79,14 @@ func (c *Crawler) OnHTML_Link(element *goquery.Selection, r *colly.Request, isNo
 			log.Printf("Feed from HTML: %s", href)
 			c.Request(NODE_TYPE_WEBSITE, page_url, NODE_TYPE_FEED, href, LINK_TYPE_LINK_REL_ALT, r.Depth+1)
 		}
+		if slices.Contains(rels, "canonical") {
+			log.Printf("canonical URL: %s", href)
+			c.Request(NODE_TYPE_WEBSITE, page_url, NODE_TYPE_CANONICAL, href, LINK_TYPE_LINK_REL_CANONICAL, r.Depth+1)
+		}
 	}
 
 	// Always track rel=me, even when nofollow is set
 	// This lets us verify rel=me links
-	// We handle noindex easlier in the process
 	if slices.Contains(rels, "me") && slices.Contains(HTML_MIMES, t) {
 		log.Printf("rel=me from HTML: %s", href)
 		c.Request(NODE_TYPE_WEBSITE, page_url, NODE_TYPE_WEBSITE, href, LINK_TYPE_LINK_REL_ME, r.Depth+1)

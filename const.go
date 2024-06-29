@@ -20,6 +20,7 @@ const (
 	NODE_TYPE_FEED
 	NODE_TYPE_WEBSITE
 	NODE_TYPE_BLOGROLL
+	NODE_TYPE_CANONICAL
 )
 
 type OutputMode = string
@@ -61,11 +62,12 @@ var HTML_MIMES = []string{
 }
 
 const (
-	LINK_TYPE_LINK_REL_ME       = "rel_me"
-	LINK_TYPE_LINK_REL_BLOGROLL = "rel_blogroll"
-	LINK_TYPE_LINK_REL_ALT      = "rel_alt"
-	LINK_TYPE_FROM_FEED         = "from_feed"
-	LINK_TYPE_FROM_OPML         = "from_opml"
+	LINK_TYPE_LINK_REL_ME        = "rel_me"
+	LINK_TYPE_LINK_REL_BLOGROLL  = "rel_blogroll"
+	LINK_TYPE_LINK_REL_ALT       = "rel_alt"
+	LINK_TYPE_FROM_FEED          = "from_feed"
+	LINK_TYPE_FROM_OPML          = "from_opml"
+	LINK_TYPE_LINK_REL_CANONICAL = "rel_canonical"
 )
 
 var META_ROBOT_NOINDEX_VARIANTS = []string{
@@ -76,6 +78,10 @@ var META_ROBOT_NOINDEX_VARIANTS = []string{
 var META_ROBOT_NOFOLLOW_VARIANTS = []string{
 	"nofollow",
 	"none",
+}
+
+var META_ROBOT_NOARCHIVE_VARIANTS = []string{
+	"noarchive",
 }
 
 const REFERER_STRING = "https://alexsci.com/rss-blogroll-network/"

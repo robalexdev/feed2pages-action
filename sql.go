@@ -31,14 +31,15 @@ func (db *DB) Open() {
 
 func (db *DB) TrackFeed(fm *FeedFrontmatter) {
 	_, err := db.db.Exec(`
-    INSERT INTO feeds(date, description, title, feed_link, feed_id, feed_type, is_podcast)
-      values(?,?,?,?,?,?,?)
+    INSERT INTO feeds(date, description, title, feed_link, feed_id, feed_type, is_podcast, is_noarchive)
+      values(?,?,?,?,?,?,?,?)
     ON CONFLICT(feed_link)
       DO UPDATE SET
         date=excluded.date,
         description=excluded.description,
         title=excluded.title,
-        is_podcast=excluded.is_podcast;
+        is_podcast=excluded.is_podcast,
+        is_noarchive=excluded.is_noarchive;
     `,
 		fm.Date,
 		fm.Description,
@@ -47,6 +48,7 @@ func (db *DB) TrackFeed(fm *FeedFrontmatter) {
 		fm.Params.Id,
 		fm.Params.FeedType,
 		fm.Params.IsPodcast,
+		fm.Params.IsNoarchive,
 	)
 
 	if err != nil {
@@ -183,7 +185,8 @@ func (db *DB) Init() {
     feed_link TEXT,
     feed_id TEXT,
     feed_type TEXT,
-    is_podcast TEXT,
+    is_podcast BOOL,
+    is_noarchive BOOL,
     UNIQUE(feed_link)
   );
   `
