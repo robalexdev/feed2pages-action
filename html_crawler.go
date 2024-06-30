@@ -19,7 +19,15 @@ func (c *Crawler) OnHTML(element *colly.HTMLElement) {
 	}
 
 	// Check for meta robots for opt-outs
-	metaSel := element.DOM.Find("meta[name='robots']")
+	metaSelAll := element.DOM.Find("meta[name='robots']")
+	metaSelOurs := element.DOM.Find("meta[name='feed2pages/0.1']")
+
+	// Prefer meta tags that are just for us
+	metaSel := metaSelOurs
+	if len(metaSel.Nodes) == 0 {
+		metaSel = metaSelAll
+	}
+
 	isNofollow := false
 	for i := range metaSel.Nodes {
 		single := metaSel.Eq(i)
