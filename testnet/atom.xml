@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom">
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="de-DE">
 
   <title>Example Atom Feed</title>
   <link rel="alternate" href="http://localhost:8000/atom-website" />
@@ -8,11 +8,27 @@
   <subtitle>Subtitle is desc</subtitle>
 
   <entry>
-    <title>Example Atom Article #1</title>
+    <title xml:lang="en-US">Example Atom Article #1</title>
     <link href="http://localhost:8000/atom-article-1" />
     <id>urn:uuid:1225c699-cfb8-4ebb-aaaa-80da344efa6a</id>
     <updated>2003-12-13T18:30:02Z</updated>
     <summary>this is the summary</summary>
+  </entry>
+
+  <entry>
+    <title xml:lang="ru">Example Atom Article #2 (Russian)</title>
+    <link href="http://localhost:8000/atom-article-2-ru" />
+    <id>urn:uuid:1225c699-cfb8-4ecc-aabb-80da344efa6a</id>
+    <updated>2003-12-13T18:30:02Z</updated>
+    <summary>this is the Russian summary</summary>
+  </entry>
+
+  <entry>
+    <title>Example Atom Article #3 (Use feed language)</title>
+    <link href="http://localhost:8000/atom-article-3" />
+    <id>urn:uuid:1225c699-cfb8-4eff-efef-80da344efa6a</id>
+    <updated>2003-12-13T18:30:02Z</updated>
+    <summary>this is the last summary</summary>
   </entry>
 
 </feed>

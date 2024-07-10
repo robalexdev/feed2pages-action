@@ -4,6 +4,7 @@
   <title>testing</title>
   <link>http://localhost:8000/</link>
   <description>Test RSS Feed</description>
+  <language>en-us</language>
 
   <item>
     <title>Post D 1</title>

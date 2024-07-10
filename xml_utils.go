@@ -17,21 +17,15 @@ func xmlText(node *xmlquery.Node, xpathStr string) string {
 
 func xmlTextMultiple(node *xmlquery.Node, xpathStr string) []string {
 	found := xmlquery.Find(node, xpathStr)
-	if len(found) < 1 {
-		return []string{}
-	}
 	res := []string{}
 	for _, node := range found {
-		res = append(res, node.InnerText())
+		res = append(res, strings.TrimSpace(node.InnerText()))
 	}
 	return res
 }
 
 func xmlPathAttrMultipleWithNamespace(node *xmlquery.Node, xpath *xpath.Expr, attrName string) []string {
 	found := xmlquery.QuerySelectorAll(node, xpath)
-	if len(found) < 1 {
-		return []string{}
-	}
 	res := []string{}
 	for _, node := range found {
 		res = append(res, strings.TrimSpace(node.SelectAttr(attrName)))
@@ -45,14 +39,22 @@ func xmlAttr(node *xmlquery.Node, attrName string) string {
 
 func xmlPathAttrMultiple(node *xmlquery.Node, xpathStr, attrName string) []string {
 	found := xmlquery.Find(node, xpathStr)
-	if len(found) < 1 {
-		return []string{}
-	}
 	res := []string{}
 	for _, node := range found {
 		res = append(res, xmlAttr(node, attrName))
 	}
 	return res
+}
+
+func xmlPathAttrSingle(node *xmlquery.Node, xpathStr, attrName string) string {
+	found := xmlquery.Find(node, xpathStr)
+	for _, node := range found {
+		res := xmlAttr(node, attrName)
+		if len(res) > 0 {
+			return res
+		}
+	}
+	return ""
 }
 
 func collectLinkHrefs(r *colly.Request, selectExpr string, node *xmlquery.Node) []string {

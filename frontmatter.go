@@ -1,6 +1,7 @@
 package main
 
 import (
+	"slices"
 	"strings"
 )
 
@@ -18,6 +19,7 @@ type PostParams struct {
 	Id         string   `yaml:"id"`
 	Link       string   `yaml:"link"`
 	Categories []string `yaml:"categories"`
+	Language   string   `yaml:"language"`
 }
 
 func NewPostFrontmatter(feed_url, guid, link string) *PostFrontmatter {
@@ -29,6 +31,13 @@ func NewPostFrontmatter(feed_url, guid, link string) *PostFrontmatter {
 
 func (f *PostFrontmatter) WithTitle(title string) {
 	f.Title = truncateText(title, 200)
+}
+
+func (f *PostFrontmatter) WithLanguage(lang string) {
+	lang, err := languageFromLanguageTag(lang)
+	if err == nil {
+		f.Params.Language = lang
+	}
 }
 
 func (f *PostFrontmatter) WithCategories(cats []string) {
@@ -73,6 +82,7 @@ type FeedParams struct {
 	BlogRolls   []string `yaml:"blogrolls"`
 	FeedType    string   `yaml:"feedtype"`
 	Categories  []string `yaml:"categories"`
+	Language    string   `yaml:"language"`
 }
 
 func NewFeedFrontmatter(feed_url string) *FeedFrontmatter {
@@ -111,12 +121,19 @@ func (f *FeedFrontmatter) IsPodcast(isPodcast bool) {
 }
 
 func (f *FeedFrontmatter) WithCategories(cats []string) {
-	for _, cat := range cats {
+	slices.Sort(cats)
+	for _, cat := range slices.Compact(cats) {
 		cat = strings.TrimSpace(cat)
-		if len(cat) == 0 {
-			continue
+		if len(cat) > 0 {
+			f.Params.Categories = append(f.Params.Categories, cat)
 		}
-		f.Params.Categories = append(f.Params.Categories, cat)
+	}
+}
+
+func (f *FeedFrontmatter) WithLanguage(language string) {
+	lang, err := languageFromLanguageTag(language)
+	if err == nil {
+		f.Params.Language = lang
 	}
 }
 

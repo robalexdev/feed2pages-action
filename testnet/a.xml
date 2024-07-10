@@ -6,6 +6,7 @@
   <description>Test RSS Feed A</description>
   <pubDate>Sat, 07 Sep 2002 00:00:01 GMT</pubDate>
   <category>Example</category>
+  <language>en-us</language>
 
   <!-- custom namespace -->
   <s:blogroll>http://localhost:8000/a.opml</s:blogroll>

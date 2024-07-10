@@ -1,7 +1,6 @@
 package main
 
 import (
-	"cmp"
 	"github.com/antchfx/xmlquery"
 	"github.com/gocolly/colly/v2"
 	"log"
@@ -18,12 +17,16 @@ func (c *Crawler) OnXML_AtomFeed(headers *http.Header, r *colly.Request, channel
 	date := fmtDate(xmlText(channel, "updated"))
 	categories := xmlPathAttrMultiple(channel, "category", "term")
 
+	// Find a top level language
+	language := strings.TrimSpace(channel.SelectAttr("xml:lang"))
+
 	feed := NewFeedFrontmatter(feed_url)
 	feed.WithDate(date)
 	feed.WithTitle(title)
 	feed.WithFeedType("atom")
 	feed.WithDescription(description)
 	feed.WithCategories(categories)
+	feed.WithLanguage(language)
 	setNoArchive(feed, headers)
 
 	if blocked, blockWord := hasBlockWords(title, c.Config); blocked {
@@ -35,21 +38,29 @@ func (c *Crawler) OnXML_AtomFeed(headers *http.Header, r *colly.Request, channel
 		return
 	}
 
-	for _, link := range links {
-		if isBlockedPost(link, title, feed.Params.Id, c.Config) {
-			continue
-		}
-
-		if blocked, domain := isBlockedDomain(link, c.Config); blocked {
-			log.Printf("Domain is blocked: %s", domain)
-			continue
-		}
-
-		log.Println("DEPTH:", r.Depth)
-		isDirect := r.Depth < 4
+	link := ""
+	if len(links) > 0 {
+		link = links[0]
 		feed.WithLink(link)
-		c.SaveFeed(feed, isDirect)
+		if len(links) > 1 {
+			log.Printf("TODO: Add support for multiple links")
+		}
+	}
 
+	if isBlockedPost(link, title, feed.Params.Id, c.Config) {
+		return
+	}
+
+	if blocked, domain := isBlockedDomain(link, c.Config); blocked {
+		log.Printf("Domain is blocked: %s", domain)
+		return
+	}
+
+	log.Println("DEPTH:", r.Depth)
+	isDirect := r.Depth < 4
+	c.SaveFeed(feed, isDirect)
+
+	if len(link) > 0 {
 		log.Printf("Searching for blogroll in: %s", link)
 		c.Request(NODE_TYPE_FEED, feed_url, NODE_TYPE_WEBSITE, link, LINK_TYPE_LINK_REL_ALT, r.Depth+1)
 	}
@@ -57,10 +68,10 @@ func (c *Crawler) OnXML_AtomFeed(headers *http.Header, r *colly.Request, channel
 	// Atom feeds don't have a blogroll syntax yet
 	// Add here when they do
 
-	c.CollectAtomEntries(r, channel)
+	c.CollectAtomEntries(r, channel, language)
 }
 
-func (c *Crawler) CollectAtomEntries(r *colly.Request, channel *xmlquery.Node) {
+func (c *Crawler) CollectAtomEntries(r *colly.Request, channel *xmlquery.Node, feed_language string) {
 	if r.Depth > c.Config.PostCollectionDepth {
 		return
 	}
@@ -71,7 +82,7 @@ func (c *Crawler) CollectAtomEntries(r *colly.Request, channel *xmlquery.Node) {
 	posts := []*PostFrontmatter{}
 	xmlItems := xmlquery.Find(channel, "//entry")
 	for _, entry := range xmlItems {
-		entries, ok := c.OnXML_AtomEntry(r, entry)
+		entries, ok := c.OnXML_AtomEntry(r, entry, feed_language)
 		if ok {
 			posts = append(posts, entries...)
 		}
@@ -79,7 +90,7 @@ func (c *Crawler) CollectAtomEntries(r *colly.Request, channel *xmlquery.Node) {
 
 	slices.SortFunc(posts, func(a, b *PostFrontmatter) int {
 		// Reverse chronological
-		return cmp.Compare(b.Date, a.Date)
+		return -1 * cmpDateStr(a.Date, b.Date)
 	})
 
 	for i, post := range posts {
@@ -89,7 +100,7 @@ func (c *Crawler) CollectAtomEntries(r *colly.Request, channel *xmlquery.Node) {
 	}
 }
 
-func (c *Crawler) OnXML_AtomEntry(r *colly.Request, entry *xmlquery.Node) ([]*PostFrontmatter, bool) {
+func (c *Crawler) OnXML_AtomEntry(r *colly.Request, entry *xmlquery.Node, feed_language string) ([]*PostFrontmatter, bool) {
 	feed_url := r.URL.String()
 
 	post_id := xmlText(entry, "id")
@@ -110,6 +121,25 @@ func (c *Crawler) OnXML_AtomEntry(r *colly.Request, entry *xmlquery.Node) ([]*Po
 
 	content := xmlText(entry, "content")
 	categories := xmlPathAttrMultiple(entry, "category", "term")
+
+	// Prefer languages set on the element itself
+	language := xmlAttr(entry, "xml:lang")
+
+	// Check a couple other places:
+	if len(language) == 0 {
+		language = xmlPathAttrSingle(entry, "content", "xml:lang")
+	}
+	if len(language) == 0 {
+		language = xmlPathAttrSingle(entry, "summary", "xml:lang")
+	}
+	if len(language) == 0 {
+		language = xmlPathAttrSingle(entry, "title", "xml:lang")
+	}
+
+	// Fall back to the feed language (if any)
+	if len(language) == 0 {
+		language = feed_language
+	}
 
 	// TODO, parse type: https://validator.w3.org/feed/docs/atom.html#text
 	//       if type=html, convert back to plain text
@@ -134,11 +164,10 @@ func (c *Crawler) OnXML_AtomEntry(r *colly.Request, entry *xmlquery.Node) ([]*Po
 	found := []*PostFrontmatter{}
 	for _, link := range links {
 		if strings.HasPrefix(link, "/") {
-			// This is a relative URL which are not well supported by readers
+			// TODO: add support for xml:base, it's standard enough that it should be supported
 			continue
 		}
-		lowLink := strings.ToLower(link)
-		if (!strings.HasPrefix(lowLink, "http://")) && (!strings.HasPrefix(lowLink, "https://")) {
+		if !isWebLink(link) {
 			// This isn't a web link
 			continue
 		}
@@ -150,6 +179,7 @@ func (c *Crawler) OnXML_AtomEntry(r *colly.Request, entry *xmlquery.Node) ([]*Po
 		post.WithContent(content)
 		post.WithFeedLink(feed_url)
 		post.WithCategories(categories)
+		post.WithLanguage(language)
 
 		if isBlockedPost(link, title, post.Params.Id, c.Config) {
 			continue

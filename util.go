@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
@@ -24,6 +25,13 @@ func setNoArchive(feed *FeedFrontmatter, headers *http.Header) {
 		}
 	}
 	feed.IsNoarchive(isNoarchive)
+}
+
+func isWebLink(link string) bool {
+	lowLink := strings.ToLower(link)
+	return strings.HasPrefix(lowLink, "http://") ||
+		strings.HasPrefix(lowLink, "https://") ||
+		strings.HasPrefix(lowLink, "gemini://")
 }
 
 func mkdirIfNotExists(path string) {
@@ -181,4 +189,40 @@ func fmtDate(in string) string {
 		return OLD_DATE_RFC3339
 	}
 	return t.Format(time.RFC3339)
+}
+
+func cmpDateStr(a, b string) int {
+	aDate, err := ParseDate(a)
+	var aUnix int64 = 0
+	if err != nil {
+		aUnix = aDate.Unix()
+	}
+	bDate, err := ParseDate(b)
+	var bUnix int64 = 0
+	if err != nil {
+		bUnix = bDate.Unix()
+	}
+	return cmp.Compare(aUnix, bUnix)
+}
+
+func ohno(err error) {
+	if err != nil {
+		panicf("%v", err)
+	}
+}
+
+// See: https://www.ietf.org/rfc/bcp/bcp47.html
+func languageFromLanguageTag(lang string) (string, error) {
+	// Language subtag is always frist, ignore the other subtags
+	lang = strings.Split(lang, "-")[0]
+	// Normalize
+	lang = strings.ToLower(strings.TrimSpace(lang))
+	// Validate
+	// language subtags can be 2 or 3 characters
+	// 4 characters is reserved for future use, so let's allow that too
+	if len(lang) >= 2 && len(lang) <= 4 {
+		return lang, nil
+	} else {
+		return "", fmt.Errorf("Invalid language code: %s", lang)
+	}
 }

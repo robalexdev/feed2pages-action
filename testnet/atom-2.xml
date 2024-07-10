@@ -6,12 +6,20 @@
   <updated>2003-12-13T18:30:02Z</updated>
   <id>urn:uuid:60a76c81-e399-11d9-b93C-0003939e0af6</id>
 
-  <entry>
+  <entry xml:lang="fr-CA">
     <title>Example Atom Article F2-1</title>
     <link href="http://localhost:8000/atom-article-f2a1"/>
     <id>urn:uuid:1225c699-cfb8-4ebb-aaaa-80da344efb0a</id>
     <updated>2003-12-13T18:30:02Z</updated>
     <summary>this a summary</summary>
+  </entry>
+
+  <entry xml:lang="ko">
+    <title>Example Atom Article F2-2</title>
+    <link href="http://localhost:8000/atom-article-f2a2"/>
+    <id>urn:uuid:1225c699-cfb8-4ebb-dddd-80da344efb0a</id>
+    <updated>2008-12-13T18:30:02Z</updated>
+    <summary>this another summary</summary>
   </entry>
 
 </feed>

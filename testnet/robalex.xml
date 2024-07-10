@@ -1,0 +1,120 @@
+<rss version="2.0">
+  <channel>
+    <title>Robert Alexander's Tech Blog</title>
+    <!-- Removed for testing
+    <link>https://alexsci.com/blog/</link>
+    -->
+    <generator>Hugo</generator>
+    <description>
+      A personal blog about #Tech, #Security, and the #Cloud
+    </description>
+    <language>en-us</language>
+    <!-- Removed for testing
+    <source:blogroll>https://feedland.com/opml?screenname=robalexdev</source:blogroll>
+    -->
+    <category>tech</category>
+    <category>security</category>
+    <category>cloud</category>
+    <lastBuildDate>Sun, 16 Jun 2024 00:00:00 +0000</lastBuildDate>
+    <pubDate>Sun, 16 Jun 2024 00:00:00 +0000</pubDate>
+    <atom:link href="https://alexsci.com/blog/rss.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Moving to Hugo</title>
+      <link>https://alexsci.com/blog/hugo-import/</link>
+      <pubDate>Sun, 16 Jun 2024 00:00:00 +0000</pubDate>
+      <author>robert@robalexdev.com (Robert Alexander)</author>
+      <guid isPermaLink="true">https://alexsci.com/blog/hugo-import/</guid>
+      <description>My blog now uses the Hugo blog framework</description>
+      <category>Hugo</category>
+      <category>Blogging</category>
+    </item>
+    <item>
+      <title>RSS Categories - In Practice</title>
+      <link>https://alexsci.com/blog/rss-categories/</link>
+      <pubDate>Thu, 06 Jun 2024 00:00:00 +0000</pubDate>
+      <author>robert@robalexdev.com (Robert Alexander)</author>
+      <guid isPermaLink="false">f4b13a62-fcec-4729-a208-4a1f8312ba05</guid>
+      <description>How do RSS Categories work in practice?</description>
+      <category>RSS</category>
+      <category>Blogging</category>
+      <category>Taxonomies</category>
+    </item>
+    <item>
+      <title>RSS blogrolls are a federated social network</title>
+      <link>https://alexsci.com/blog/blogroll-network/</link>
+      <pubDate>Mon, 13 May 2024 00:00:00 +0000</pubDate>
+      <author>robert@robalexdev.com (Robert Alexander)</author>
+      <guid isPermaLink="false">735bae54-8a58-4b74-8782-57c22b000822</guid>
+      <description>
+        Could a modern look at RSS feeds and blogrolls help the small-web much like the fediverse is revitalizing community in social networks?
+      </description>
+      <category>Hugo</category>
+      <category>Blogging</category>
+    </item>
+    <item>
+      <title>Designing Personal Software</title>
+      <link>https://alexsci.com/blog/personal-apps/</link>
+      <pubDate>Sun, 25 Feb 2024 00:00:00 +0000</pubDate>
+      <author>robert@robalexdev.com (Robert Alexander)</author>
+      <guid isPermaLink="false">8e571d6e-0895-46af-9437-e851a23d0dc9</guid>
+      <description>Why we need more to-do apps</description>
+      <category>Software</category>
+    </item>
+    <item>
+      <title>Certificate Authority Trustworthiness</title>
+      <link>https://alexsci.com/blog/ca-trust/</link>
+      <pubDate>Tue, 18 Jul 2023 00:00:00 +0000</pubDate>
+      <author>robert@robalexdev.com (Robert Alexander)</author>
+      <guid isPermaLink="false">6e7cf359-3482-4a19-82c3-2f986099fdb1</guid>
+      <description>
+        Challenges facing the CAs and why we still trust them
+      </description>
+      <category>HTTPS</category>
+      <category>Security</category>
+    </item>
+    <item>
+      <title>HSTS preload adoption and challenges</title>
+      <link>https://alexsci.com/blog/hsts-adoption/</link>
+      <pubDate>Sat, 10 Jun 2023 00:00:00 +0000</pubDate>
+      <author>robert@robalexdev.com (Robert Alexander)</author>
+      <guid isPermaLink="false">85d63cac-1f92-4db1-abc2-b6680a4eec70</guid>
+      <description>A review of HSTS and HSTS preload list growth</description>
+      <category>HSTS</category>
+      <category>Security</category>
+    </item>
+    <item>
+      <title>A mental model for on-demand pricing</title>
+      <link>
+        https://alexsci.com/blog/modeling-on-demand-pricing/
+      </link>
+      <pubDate>Sun, 07 May 2023 00:00:00 +0000</pubDate>
+      <author>robert@robalexdev.com (Robert Alexander)</author>
+      <guid isPermaLink="false">c38ec5fe-866c-455b-a7e7-ea2efa7993ca</guid>
+      <description>
+        A model for thinking about AWS EC2 on-demand and reserved pricing
+      </description>
+      <category>Cloud</category>
+      <category>Cost Optimization</category>
+    </item>
+    <item>
+      <title>Improving HTTPS on private networks</title>
+      <link>https://alexsci.com/blog/improve-https-1/</link>
+      <pubDate>Sun, 23 Apr 2023 00:00:00 +0000</pubDate>
+      <author>robert@robalexdev.com (Robert Alexander)</author>
+      <guid isPermaLink="false">20ace332-7d7a-4306-8fab-d8e9de4bca81</guid>
+      <description>Launching the getlocalcert.net service</description>
+      <category>HTTPS</category>
+      <category>Security</category>
+    </item>
+    <item>
+      <title>Name "Constrain't" on Chrome</title>
+      <link>https://alexsci.com/blog/name-non-constraint/</link>
+      <pubDate>Sat, 01 Apr 2023 00:00:00 +0000</pubDate>
+      <author>robert@robalexdev.com (Robert Alexander)</author>
+      <guid isPermaLink="false">fa55ab56-3d78-4e5a-837d-0822b1916b12</guid>
+      <description>When Name Constraints ain&rsquo;t enforced</description>
+      <category>HTTPS</category>
+      <category>Security</category>
+    </item>
+  </channel>
+</rss>

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"cmp"
 	"github.com/antchfx/xmlquery"
 	"github.com/gocolly/colly/v2"
 	"log"
@@ -18,6 +17,7 @@ func (c *Crawler) OnXML_RssChannel(headers *http.Header, r *colly.Request, chann
 	title := xmlText(channel, "title")
 	description := xmlText(channel, "description")
 	date := fmtDate(xmlText(channel, "pubDate"))
+	language := xmlText(channel, "language")
 
 	// Podcasts may use iTunes categories
 	categories := xmlPathAttrMultipleWithNamespace(channel, c.ITunesCategoryWithNamespaceXPath, "text")
@@ -49,6 +49,7 @@ func (c *Crawler) OnXML_RssChannel(headers *http.Header, r *colly.Request, chann
 	feed.WithFeedType("rss")
 	feed.WithBlogRolls(blogrollUrls)
 	feed.WithCategories(categories)
+	feed.WithLanguage(language)
 	feed.IsPodcast(isPodcast)
 	setNoArchive(feed, headers)
 
@@ -84,10 +85,10 @@ func (c *Crawler) OnXML_RssChannel(headers *http.Header, r *colly.Request, chann
 		c.Request(NODE_TYPE_FEED, feed_url, NODE_TYPE_WEBSITE, link, LINK_TYPE_FROM_FEED, r.Depth+1)
 	}
 
-	c.CollectRssItems(r, channel)
+	c.CollectRssItems(r, channel, language)
 }
 
-func (c *Crawler) CollectRssItems(r *colly.Request, channel *xmlquery.Node) {
+func (c *Crawler) CollectRssItems(r *colly.Request, channel *xmlquery.Node, feed_language string) {
 	if r.Depth > c.Config.PostCollectionDepth {
 		return
 	}
@@ -98,7 +99,7 @@ func (c *Crawler) CollectRssItems(r *colly.Request, channel *xmlquery.Node) {
 	posts := []*PostFrontmatter{}
 	xmlItems := xmlquery.Find(channel, "//item")
 	for _, item := range xmlItems {
-		post, ok := c.OnXML_RssItem(r, item)
+		post, ok := c.OnXML_RssItem(r, item, feed_language)
 		if ok {
 			posts = append(posts, post)
 		}
@@ -106,7 +107,7 @@ func (c *Crawler) CollectRssItems(r *colly.Request, channel *xmlquery.Node) {
 
 	slices.SortFunc(posts, func(a, b *PostFrontmatter) int {
 		// Reverse chronological
-		return cmp.Compare(b.Date, a.Date)
+		return -1 * cmpDateStr(a.Date, b.Date)
 	})
 
 	for i, post := range posts {
@@ -116,7 +117,7 @@ func (c *Crawler) CollectRssItems(r *colly.Request, channel *xmlquery.Node) {
 	}
 }
 
-func (c *Crawler) OnXML_RssItem(r *colly.Request, item *xmlquery.Node) (*PostFrontmatter, bool) {
+func (c *Crawler) OnXML_RssItem(r *colly.Request, item *xmlquery.Node, feed_language string) (*PostFrontmatter, bool) {
 	feed_url := r.URL.String()
 
 	post_id := xmlText(item, "guid")
@@ -134,6 +135,9 @@ func (c *Crawler) OnXML_RssItem(r *colly.Request, item *xmlquery.Node) (*PostFro
 	post.WithContent(content)
 	post.WithFeedLink(feed_url)
 	post.WithCategories(categories)
+
+	// TODO: Should we try xml:lang too?
+	post.WithLanguage(feed_language)
 
 	if title == "" {
 		return nil, false
@@ -161,8 +165,7 @@ func (c *Crawler) OnXML_RssItem(r *colly.Request, item *xmlquery.Node) (*PostFro
 		// This is a relative URL which are not well supported by readers
 		return nil, false
 	}
-	lowLink := strings.ToLower(link)
-	if (!strings.HasPrefix(lowLink, "http://")) && (!strings.HasPrefix(lowLink, "https://")) {
+	if !isWebLink(link) {
 		// This isn't a web link
 		return nil, false
 	}

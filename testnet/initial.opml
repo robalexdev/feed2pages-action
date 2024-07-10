@@ -5,6 +5,7 @@
     <outline text="outer">
       <outline text="Feed-A" xmlUrl="http://localhost:8000/a.xml" />
       <outline text="Atom-Feed-1" xmlUrl="http://localhost:8000/atom.xml" />
+      <outline text="Rob Alex Blog" xmlUrl="http://localhost:8000/robalex.xml" />
     </outline>
   </body>
 </opml>

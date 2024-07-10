@@ -1,16 +1,15 @@
 package main
 
 import (
-	"database/sql"
-	"log"
-
-	_ "github.com/mattn/go-sqlite3"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const fileName = "feed2pages.db"
 
 type DB struct {
-	db *sql.DB
+	db *gorm.DB
 }
 
 func NewDB() *DB {
@@ -22,230 +21,218 @@ func NewDB() *DB {
 
 func (db *DB) Open() {
 	var err error
-	db.db, err = sql.Open("sqlite3", fileName)
+	db.db, err = gorm.Open(sqlite.Open(fileName), &gorm.Config{
+		PrepareStmt: true,
+	})
 	if err != nil {
 		panicf("Can't open database: %v", err)
 	}
-	db.db.SetMaxOpenConns(1)
 }
 
 func (db *DB) TrackFeed(fm *FeedFrontmatter) {
-	_, err := db.db.Exec(`
-    INSERT INTO feeds(date, description, title, feed_link, feed_id, feed_type, is_podcast, is_noarchive)
-      values(?,?,?,?,?,?,?,?)
-    ON CONFLICT(feed_link)
-      DO UPDATE SET
-        date=excluded.date,
-        description=excluded.description,
-        title=excluded.title,
-        is_podcast=excluded.is_podcast,
-        is_noarchive=excluded.is_noarchive;
-    `,
-		fm.Date,
-		fm.Description,
-		fm.Title,
-		fm.Params.FeedLink,
-		fm.Params.Id,
-		fm.Params.FeedType,
-		fm.Params.IsPodcast,
-		fm.Params.IsNoarchive,
-	)
-
-	if err != nil {
-		panicf("Unable to track feed: %v", err)
+	feed := Feed{
+		Date:        fm.Date,
+		Description: fm.Description,
+		Title:       fm.Title,
+		FeedLink:    fm.Params.FeedLink,
+		FeedId:      fm.Params.Id,
+		FeedType:    fm.Params.FeedType,
+		IsPodcast:   fm.Params.IsPodcast,
+		IsNoarchive: fm.Params.IsNoarchive,
 	}
 
-	for _, cat := range fm.Params.Categories {
-		// TODO bulk inserts?
-		db.TrackFeedCategory(cat, fm.Params.FeedLink)
+	result := db.db.
+		Clauses(
+			clause.OnConflict{
+				Columns: []clause.Column{{Name: "feed_link"}},
+				DoUpdates: clause.AssignmentColumns([]string{
+					"date", "description", "title", "is_podcast", "is_noarchive",
+				}),
+			}).
+		Create(&feed)
+	ohno(result.Error)
+
+	if len(fm.Params.Categories) > 0 {
+		cats := []FeedsByCategory{}
+		for _, cat := range fm.Params.Categories {
+			cats = append(cats, FeedsByCategory{
+				Category: cat,
+				Link:     fm.Params.FeedLink,
+			})
+		}
+		result = db.db.
+			Clauses(clause.OnConflict{DoNothing: true}).
+			Create(&cats)
+		ohno(result.Error)
 	}
-}
 
-func (db *DB) TrackFeedCategory(cat, feedlink string) {
-	_, err := db.db.Exec(`
-    INSERT INTO feeds_by_categories(category, link)
-      values(?,?)
-    ON CONFLICT(category, link)
-      DO NOTHING;
-    `,
-		cat,
-		feedlink,
-	)
-	if err != nil {
-		panicf("Unable to track feed: %v", err)
-	}
-}
-
-func (db *DB) TrackPostCategory(cat, postlink string) {
-	_, err := db.db.Exec(`
-    INSERT INTO posts_by_categories(category, link)
-      values(?,?)
-    ON CONFLICT(category, link)
-      DO NOTHING;
-    `,
-		cat,
-		postlink,
-	)
-
-	if err != nil {
-		panicf("Unable to track feed: %v", err)
+	if len(fm.Params.Language) > 0 {
+		result = db.db.
+			Clauses(clause.OnConflict{DoNothing: true}).
+			Create(&FeedsByLanguage{
+				Language: fm.Params.Language,
+				Link:     fm.Params.FeedLink,
+			})
+		ohno(result.Error)
 	}
 }
 
 func (db *DB) TrackPost(fm *PostFrontmatter) {
-	_, err := db.db.Exec(`
-    INSERT INTO posts(date, description, title, feed_id, post_link, guid)
-      values(?,?,?,?,?,?)
-    ON CONFLICT(guid)
-      DO UPDATE SET
-        date=excluded.date,
-        description=excluded.description,
-        title=excluded.title,
-        post_link=excluded.post_link;
-    `,
-		fm.Date,
-		fm.Description,
-		fm.Title,
-		fm.Params.FeedId,
-		fm.Params.Link,
-		fm.Params.Id,
-	)
+	post := Post{
+		Date:        fm.Date,
+		Description: fm.Description,
+		Title:       fm.Title,
+		FeedId:      fm.Params.FeedId,
+		PostLink:    fm.Params.Link,
+		Guid:        fm.Params.Id,
+	}
+
+	result := db.db.
+		Clauses(
+			clause.OnConflict{
+				Columns: []clause.Column{{Name: "guid"}},
+				DoUpdates: clause.AssignmentColumns([]string{
+					"date", "description", "title", "post_link",
+				}),
+			}).
+		Create(&post)
+	ohno(result.Error)
+
+	if len(fm.Params.Categories) > 0 {
+		cats := []PostsByCategory{}
+		for _, cat := range fm.Params.Categories {
+			cats = append(cats, PostsByCategory{
+				Category: cat,
+				Link:     fm.Params.Link,
+			})
+		}
+		result = db.db.
+			Clauses(clause.OnConflict{DoNothing: true}).
+			Create(&cats)
+		ohno(result.Error)
+	}
+
+	if len(fm.Params.Language) > 0 {
+		result = db.db.
+			Clauses(clause.OnConflict{DoNothing: true}).
+			Create(&PostsByLanguage{
+				Language: fm.Params.Language,
+				Link:     fm.Params.Link,
+			})
+		ohno(result.Error)
+	}
 
 	// TODO Link, blogrolls, recommended
-	if err != nil {
-		panicf("Unable to track link: %v", err)
-	}
-
-	for _, cat := range fm.Params.Categories {
-		db.TrackPostCategory(cat, fm.Params.Link)
-	}
 }
 
 func (db *DB) TrackLink(fm *LinkFrontmatter) {
-	_, err := db.db.Exec(`
-    INSERT INTO links(source_type, source_url, destination_type, destination_url, link_type)
-      values(?,?,?,?,?)
-    ON CONFLICT(source_type, source_url, destination_type, destination_url)
-      DO NOTHING
-    `,
-		fm.Params.SourceType,
-		fm.Params.SourceURL,
-		fm.Params.DestinationType,
-		fm.Params.DestinationURL,
-		fm.Params.LinkType,
-	)
-	if err != nil {
-		panicf("Unable to track link: %v", err)
+	link := Link{
+		SourceType:      int(fm.Params.SourceType),
+		SourceUrl:       fm.Params.SourceURL,
+		DestinationType: int(fm.Params.DestinationType),
+		DestinationUrl:  fm.Params.DestinationURL,
+		LinkType:        fm.Params.LinkType,
 	}
+	result := db.db.
+		Clauses(clause.OnConflict{DoNothing: true}).
+		Create(&link)
+	ohno(result.Error)
 }
 
 func (db *DB) TrackNoIndex(link string) {
-	log.Printf("NOINDEX: %s\n", link)
-	_, err := db.db.Exec(`INSERT INTO noindex(link) values(?)`, link)
-	if err != nil {
-		panicf("Unable to track noindex link: %v", err)
+	noindex := Noindex{
+		Link: link,
 	}
+	result := db.db.
+		Clauses(clause.OnConflict{DoNothing: true}).
+		Create(&noindex)
+	ohno(result.Error)
 }
 
 func (db *DB) DeleteNoIndexLinks() {
-	_, err := db.db.Exec(`
-    DELETE FROM links
-     WHERE source_url      IN(SELECT link FROM noindex)
-        OR destination_url IN(SELECT link FROM noindex);
-	`)
-	if err != nil {
-		panicf("Unable delete: %v", err)
-	}
+	result := db.db.
+		Where("source_url IN(?)",
+			db.db.
+				Model(&Noindex{}).
+				Select("link")).
+		Or(
+			db.db.Where("source_url IN(?)",
+				db.db.
+					Model(&Noindex{}).
+					Select("link"))).
+		Delete(&Link{})
+	ohno(result.Error)
+	err := db.db.Migrator().DropTable("noindex")
+	ohno(err)
+}
+
+type Feed struct {
+	ID          uint   `gorm:"primaryKey"`
+	Date        string // TODO: use time.Time
+	Description string
+	Title       string
+	FeedLink    string `gorm:"unique"`
+	FeedId      string
+	FeedType    string
+	IsPodcast   bool
+	IsNoarchive bool
+}
+
+type Post struct {
+	ID          uint   `gorm:"primaryKey"`
+	Date        string // TODO: use time.Time
+	Description string
+	Title       string
+	FeedId      string
+	PostLink    string
+	Guid        string `gorm:"unique"`
+}
+
+type PostsByCategory struct {
+	ID       uint   `gorm:"primaryKey"`
+	Category string `gorm:"uniqueIndex:uniquePostsByCat"`
+	Link     string `gorm:"uniqueIndex:uniquePostsByCat"`
+}
+
+type FeedsByCategory struct {
+	ID       uint   `gorm:"primaryKey"`
+	Category string `gorm:"uniqueIndex:uniqueFeedsByCat"`
+	Link     string `gorm:"uniqueIndex:uniqueFeedsByCat"`
+}
+
+type FeedsByLanguage struct {
+	ID       uint   `gorm:"primaryKey"`
+	Language string `gorm:"uniqueIndex:uniqueFeedsByLang"`
+	Link     string `gorm:"uniqueIndex:uniqueFeedsByLang"`
+}
+
+type PostsByLanguage struct {
+	ID       uint   `gorm:"primaryKey"`
+	Language string `gorm:"uniqueIndex:uniquePostsByLang"`
+	Link     string `gorm:"uniqueIndex:uniquePostsByLang"`
+}
+
+type Link struct {
+	ID              uint   `gorm:"primaryKey"`
+	SourceType      int    `gorm:"uniqueIndex:uniqueLink"`
+	SourceUrl       string `gorm:"uniqueIndex:uniqueLink"`
+	DestinationType int    `gorm:"uniqueIndex:uniqueLink"`
+	DestinationUrl  string `gorm:"uniqueIndex:uniqueLink"`
+	LinkType        string
+}
+
+type Noindex struct {
+	ID   uint   `gorm:"primaryKey"`
+	Link string `gorm:"uniqueIndex:uniqueNoindex"`
 }
 
 func (db *DB) Init() {
-	query := `
-  CREATE TABLE IF NOT EXISTS links (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    source_type INTEGER,
-    source_url TEXT,
-    destination_type INTEGER,
-    destination_url TEXT,
-    link_type TEXT,
-    UNIQUE(source_type, source_url, destination_type, destination_url)
-  );
-  `
-	var err error
-	_, err = db.db.Exec(query)
-	if err != nil {
-		panicf("Unable to intialize database: %v", err)
-	}
-
-	query = `
-  CREATE TABLE IF NOT EXISTS feeds (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    date TEXT,
-    description TEXT,
-    title TEXT,
-    feed_link TEXT,
-    feed_id TEXT,
-    feed_type TEXT,
-    is_podcast BOOL,
-    is_noarchive BOOL,
-    UNIQUE(feed_link)
-  );
-  `
-	_, err = db.db.Exec(query)
-	if err != nil {
-		panicf("Unable to intialize database: %v", err)
-	}
-
-	query = `
-  CREATE TABLE IF NOT EXISTS posts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    date TEXT,
-    description TEXT,
-    title TEXT,
-    feed_id TEXT,
-    post_link TEXT,
-    guid TEXT,
-    UNIQUE(guid)
-  );
-  `
-	_, err = db.db.Exec(query)
-	if err != nil {
-		panicf("Unable to intialize database: %v", err)
-	}
-
-	query = `
-  CREATE TABLE IF NOT EXISTS feeds_by_categories (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    category TEXT,
-    link TEXT,
-    UNIQUE(category, link)
-  );
-  `
-	_, err = db.db.Exec(query)
-	if err != nil {
-		panicf("Unable to intialize database: %v", err)
-	}
-
-	query = `
-  CREATE TABLE IF NOT EXISTS posts_by_categories (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    category TEXT,
-    link TEXT,
-    UNIQUE(category, link)
-  );
-  `
-	_, err = db.db.Exec(query)
-	if err != nil {
-		panicf("Unable to intialize database: %v", err)
-	}
-
-	query = `
-  CREATE TEMP TABLE noindex (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    link TEXT
-  );
-  `
-	_, err = db.db.Exec(query)
-	if err != nil {
-		panicf("Unable to intialize database: %v", err)
-	}
+	db.db.AutoMigrate(&Link{})
+	db.db.AutoMigrate(&Feed{})
+	db.db.AutoMigrate(&Post{})
+	db.db.AutoMigrate(&FeedsByCategory{})
+	db.db.AutoMigrate(&FeedsByLanguage{})
+	db.db.AutoMigrate(&PostsByCategory{})
+	db.db.AutoMigrate(&PostsByLanguage{})
+	db.db.AutoMigrate(&Noindex{})
 }

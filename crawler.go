@@ -85,7 +85,7 @@ func (c *Crawler) Request(recommender_type NodeType, recommender string, target_
 	}
 
 	// prevent file:// and other schemes
-	if parsed.Scheme == "http" && parsed.Scheme == "https" {
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return
 	}
 
