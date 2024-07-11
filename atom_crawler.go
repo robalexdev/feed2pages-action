@@ -11,7 +11,14 @@ import (
 
 func (c *Crawler) OnXML_AtomFeed(headers *http.Header, r *colly.Request, channel *xmlquery.Node) {
 	feed_url := r.URL.String()
-	links := collectLinkHrefs(r, "link[@rel='alternate']", channel)
+
+	links := collectLinkHrefs(r, "link[@rel='alternate' and @type='text/html']", channel)
+	if len(links) == 0 {
+		// Try any alternate link
+		// Don't consider non-rel-alt links, these could be rel=self
+		links = collectLinkHrefs(r, "link[@rel='alternate']", channel)
+	}
+
 	title := xmlText(channel, "title")
 	description := xmlText(channel, "subtitle")
 	date := fmtDate(xmlText(channel, "updated"))
@@ -43,7 +50,7 @@ func (c *Crawler) OnXML_AtomFeed(headers *http.Header, r *colly.Request, channel
 		link = links[0]
 		feed.WithLink(link)
 		if len(links) > 1 {
-			log.Printf("TODO: Add support for multiple links")
+			log.Printf("TODO: Add support for multiple links: %s", feed_url)
 		}
 	}
 
