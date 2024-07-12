@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/go-yaml/yaml"
 	"net"
 	"net/http"
 	"slices"
@@ -9,6 +10,8 @@ import (
 
 type Config struct {
 	FeedUrls []string `yaml:"feed_urls"`
+
+	PrivateBlocksFile string `yaml:"private_blocks_file"`
 
 	// Post limits and filters
 	BlockWords       []string `yaml:"block_words"`
@@ -55,6 +58,13 @@ type Config struct {
 	HttpProxyURL *string `yaml:"http_proxy_url"`
 
 	HttpOnlyHosts []string `yaml:"http_only_hosts"`
+}
+
+type PrivateConfig struct {
+	// Filters not shared with the world
+	BlockWords   []string `yaml:"block_words"`
+	BlockDomains []string `yaml:"block_domains"`
+	BlockPosts   []string `yaml:"block_posts"`
 }
 
 func strDefault(a *string, b string) string {
@@ -109,6 +119,24 @@ func (c *Config) Parse() *ParsedConfig {
 	out.BlockPosts = make(map[string]bool, len(c.BlockPosts))
 	for _, blockTerm := range c.BlockPosts {
 		out.BlockPosts[blockTerm] = true
+	}
+
+	if len(c.PrivateBlocksFile) > 0 {
+		content, closer, err := readFile(c.PrivateBlocksFile)
+		if err != nil {
+			panicf("Unable to parse config: %e", err)
+		}
+		defer closer.Close()
+		priv := PrivateConfig{}
+		decoder := yaml.NewDecoder(content)
+		err = decoder.Decode(&priv)
+		ohno(err)
+
+		out.BlockWords = append(out.BlockWords, priv.BlockWords...)
+		out.BlockDomains = append(out.BlockDomains, priv.BlockDomains...)
+		for _, blockTerm := range priv.BlockPosts {
+			out.BlockPosts[blockTerm] = true
+		}
 	}
 
 	out.OutputModes = c.ParseOutputMode()
