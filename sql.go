@@ -29,6 +29,27 @@ func (db *DB) Open() {
 	}
 }
 
+func (db *DB) TrackBlogroll(fm *BlogrollFrontmatter) {
+	blogroll := Blogroll{
+		Date:        fm.Date,
+		Description: fm.Description,
+		Title:       fm.Title,
+		BlogrollId:  fm.Params.Id,
+		Link:        fm.Params.Link,
+	}
+
+	result := db.db.
+		Clauses(
+			clause.OnConflict{
+				Columns: []clause.Column{{Name: "link"}},
+				DoUpdates: clause.AssignmentColumns([]string{
+					"date", "description", "title",
+				}),
+			}).
+		Create(&blogroll)
+	ohno(result.Error)
+}
+
 func (db *DB) TrackFeed(fm *FeedFrontmatter) {
 	feed := Feed{
 		Date:        fm.Date,
@@ -166,6 +187,15 @@ func (db *DB) DeleteNoIndexLinks() {
 	ohno(err)
 }
 
+type Blogroll struct {
+	ID          uint   `gorm:"primaryKey"`
+	Date        string // TODO: use time.Time
+	Description string
+	Title       string
+	Link        string `gorm:"unique"`
+	BlogrollId  string
+}
+
 type Feed struct {
 	ID          uint   `gorm:"primaryKey"`
 	Date        string // TODO: use time.Time
@@ -230,6 +260,7 @@ func (db *DB) Init() {
 	db.db.AutoMigrate(&Link{})
 	db.db.AutoMigrate(&Feed{})
 	db.db.AutoMigrate(&Post{})
+	db.db.AutoMigrate(&Blogroll{})
 	db.db.AutoMigrate(&FeedsByCategory{})
 	db.db.AutoMigrate(&FeedsByLanguage{})
 	db.db.AutoMigrate(&PostsByCategory{})

@@ -29,6 +29,7 @@ type Config struct {
 	FollowingFolderName *string `yaml:"following_folder_name"`
 	DiscoverFolderName  *string `yaml:"discover_folder_name"`
 	NetworkFolderName   *string `yaml:"network_folder_name"`
+	BlogrollFolderName  *string `yaml:"blogroll_folder_name"`
 
 	// Should we add content on-top-of existing content
 	// or should we remove and replace it?
@@ -145,6 +146,7 @@ func (c *Config) Parse() *ParsedConfig {
 	out.FollowingFolderName = strDefault(c.FollowingFolderName, contentPath(DEFAULT_FOLLOWING_FOLDER))
 	out.DiscoverFolderName = strDefault(c.DiscoverFolderName, contentPath(DEFAULT_DISCOVER_FOLDER))
 	out.NetworkFolderName = strDefault(c.NetworkFolderName, contentPath(DEFAULT_NETWORK_FOLDER))
+	out.BlogrollFolderName = strDefault(c.BlogrollFolderName, contentPath(DEFAULT_BLOGROLL_FOLDER))
 
 	out.RemoveOldContent = boolDefault(c.RemoveOldContent, true)
 
@@ -192,6 +194,7 @@ type ParsedConfig struct {
 	FollowingFolderName string
 	DiscoverFolderName  string
 	NetworkFolderName   string
+	BlogrollFolderName  string
 
 	RemoveOldContent bool
 

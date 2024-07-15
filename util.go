@@ -166,11 +166,13 @@ func cleanupContentOutputDirs(config *ParsedConfig) {
 	mkdirIfNotExists(config.FollowingFolderName)
 	mkdirIfNotExists(config.DiscoverFolderName)
 	mkdirIfNotExists(config.NetworkFolderName)
+	mkdirIfNotExists(config.BlogrollFolderName)
 	if config.RemoveOldContent {
 		rmGenerated(POST_PREFIX, config.ReadingFolderName)
 		rmGenerated(FEED_PREFIX, config.FollowingFolderName)
 		rmGenerated(FEED_PREFIX, config.DiscoverFolderName)
 		rmGenerated(LINK_PREFIX, config.NetworkFolderName)
+		rmGenerated(BLOGROLL_PREFIX, config.BlogrollFolderName)
 	}
 }
 

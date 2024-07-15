@@ -6,10 +6,12 @@ const DEFAULT_READING_FOLDER = "reading"
 const DEFAULT_FOLLOWING_FOLDER = "following"
 const DEFAULT_DISCOVER_FOLDER = "discover"
 const DEFAULT_NETWORK_FOLDER = "network"
+const DEFAULT_BLOGROLL_FOLDER = "blogroll"
 
 const POST_PREFIX = "post-"
 const FEED_PREFIX = "feed-"
 const LINK_PREFIX = "link-"
+const BLOGROLL_PREFIX = "br-"
 
 // This uses a float as a workaround for Go-Colly
 // marshaling, which converts int to float

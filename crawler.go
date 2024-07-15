@@ -152,7 +152,7 @@ func (c *Crawler) OnResponseHandler(resp *colly.Response) {
 		return
 	}
 
-	processXmlQuery(headers, r, "/opml/body//outline", doc, c.OnXML_OpmlOutline)
+	processXmlQuery(headers, r, "/opml", doc, c.OnXML_Opml)
 	processXmlQuery(headers, r, "/rss/channel", doc, c.OnXML_RssChannel)
 	processXmlQuery(headers, r, "/feed", doc, c.OnXML_AtomFeed)
 }
@@ -253,5 +253,15 @@ func (c *Crawler) SavePost(f *PostFrontmatter) {
 	}
 	if slices.Contains(c.Config.OutputModes, OUTPUT_MODE_SQL) {
 		c.db.TrackPost(f)
+	}
+}
+
+func (c *Crawler) SaveBlogroll(f *BlogrollFrontmatter) {
+	if slices.Contains(c.Config.OutputModes, OUTPUT_MODE_HUGO_CONTENT) {
+		path := generatedFilePath(c.Config.BlogrollFolderName, BLOGROLL_PREFIX, f.Params.Id)
+		writeYaml(f, path)
+	}
+	if slices.Contains(c.Config.OutputModes, OUTPUT_MODE_SQL) {
+		c.db.TrackBlogroll(f)
 	}
 }

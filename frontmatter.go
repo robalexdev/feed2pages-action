@@ -166,3 +166,56 @@ func NewLinkFrontmatter(source_type NodeType, source_url string, destination_typ
 func buildLinkId(source, dest string) string {
 	return md5Hex(source + "\n" + dest)
 }
+
+type BlogrollFrontmatter struct {
+	Date        string         `yaml:"date"`
+	Description string         `yaml:"description"`
+	Title       string         `yaml:"title"`
+	Params      BlogrollParams `yaml:"params"`
+}
+
+type BlogrollParams struct {
+	Id       string            `yaml:"id"`
+	Link     string            `yaml:"link"`
+	Outlines []BlogrollOutline `yaml:"outlines"`
+}
+
+func (f *BlogrollFrontmatter) WithTitle(title string) {
+	f.Title = truncateText(title, 200)
+}
+func (f *BlogrollFrontmatter) WithDescription(description string) {
+	f.Description = truncateText(description, 500)
+}
+func (f *BlogrollFrontmatter) WithDate(date string) {
+	f.Date = date
+}
+
+type BlogrollOutline struct {
+	Text     string `yaml:"text"`
+	XmlUrl   string `yaml:"xmlUrl"`
+	HtmlUrl  string `yaml:"htmlUrl"`
+	Category string `yaml:"category"`
+}
+
+func NewBlogrollFrontmatter(url string) *BlogrollFrontmatter {
+	out := new(BlogrollFrontmatter)
+	out.Params.Link = url
+	out.Params.Id = buildSafeId("", url)
+	return out
+}
+
+func (f *BlogrollOutline) WithText(text string) {
+	f.Text = truncateText(text, 200)
+}
+
+func (f *BlogrollOutline) WithXmlUrl(url string) {
+	f.XmlUrl = url
+}
+
+func (f *BlogrollOutline) WithHtmlUrl(url string) {
+	f.HtmlUrl = url
+}
+
+func (f *BlogrollOutline) WithCategory(cat string) {
+	f.Category = cat
+}
