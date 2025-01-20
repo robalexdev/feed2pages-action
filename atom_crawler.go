@@ -97,7 +97,7 @@ func (c *Crawler) CollectAtomEntries(r *colly.Request, channel *xmlquery.Node, f
 
 	slices.SortFunc(posts, func(a, b *PostFrontmatter) int {
 		// Reverse chronological
-		return -1 * cmpDateStr(a.Date, b.Date)
+		return cmpDateStr(b.Date, a.Date)
 	})
 
 	for i, post := range posts {

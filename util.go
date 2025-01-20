@@ -196,12 +196,12 @@ func fmtDate(in string) string {
 func cmpDateStr(a, b string) int {
 	aDate, err := ParseDate(a)
 	var aUnix int64 = 0
-	if err != nil {
+	if err == nil {
 		aUnix = aDate.Unix()
 	}
 	bDate, err := ParseDate(b)
 	var bUnix int64 = 0
-	if err != nil {
+	if err == nil {
 		bUnix = bDate.Unix()
 	}
 	return cmp.Compare(aUnix, bUnix)

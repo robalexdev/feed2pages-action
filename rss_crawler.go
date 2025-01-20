@@ -13,7 +13,7 @@ func (c *Crawler) OnXML_RssChannel(headers *http.Header, r *colly.Request, chann
 	isPodcast := false
 	feed_url := r.URL.String()
 
-	link := xmlText(channel, "link")
+	link := xmlText(channel, "link[not(@rel=\"next\")]")
 	title := xmlText(channel, "title")
 	description := xmlText(channel, "description")
 	date := fmtDate(xmlText(channel, "pubDate"))
@@ -107,7 +107,7 @@ func (c *Crawler) CollectRssItems(r *colly.Request, channel *xmlquery.Node, feed
 
 	slices.SortFunc(posts, func(a, b *PostFrontmatter) int {
 		// Reverse chronological
-		return -1 * cmpDateStr(a.Date, b.Date)
+		return cmpDateStr(b.Date, a.Date)
 	})
 
 	for i, post := range posts {
