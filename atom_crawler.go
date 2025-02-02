@@ -65,7 +65,6 @@ func (c *Crawler) OnXML_AtomFeed(headers *http.Header, r *colly.Request, channel
 
 	log.Println("DEPTH:", r.Depth)
 	isDirect := r.Depth < 4
-	c.SaveFeed(feed, isDirect)
 
 	if len(link) > 0 {
 		log.Printf("Searching for blogroll in: %s", link)
@@ -75,15 +74,19 @@ func (c *Crawler) OnXML_AtomFeed(headers *http.Header, r *colly.Request, channel
 	// Atom feeds don't have a blogroll syntax yet
 	// Add here when they do
 
-	c.CollectAtomEntries(r, channel, language)
+	postCount, avgPostLen, avgPostPerDay := c.CollectAtomEntries(r, channel, language)
+	feed.WithPostCount(postCount)
+	feed.WithAvgPostLen(avgPostLen)
+	feed.WithAvgPostPerDay(avgPostPerDay)
+	c.SaveFeed(feed, isDirect)
 }
 
-func (c *Crawler) CollectAtomEntries(r *colly.Request, channel *xmlquery.Node, feed_language string) {
+func (c *Crawler) CollectAtomEntries(r *colly.Request, channel *xmlquery.Node, feed_language string) (int, int, float32) {
 	if r.Depth > c.Config.PostCollectionDepth {
-		return
+		return 0, 0, 0.0
 	}
 	if c.Config.MaxPostsPerFeed < 1 {
-		return
+		return 0, 0, 0.0
 	}
 
 	posts := []*PostFrontmatter{}
@@ -100,11 +103,34 @@ func (c *Crawler) CollectAtomEntries(r *colly.Request, channel *xmlquery.Node, f
 		return cmpDateStr(b.Date, a.Date)
 	})
 
+	postLenSum := int(0)
 	for i, post := range posts {
+		postLenSum += len(post.Params.Content)
 		if i < c.Config.MaxPostsPerFeed {
 			c.SavePost(post)
 		}
 	}
+
+	numPosts := len(posts)
+	avgPostLen := 0
+	avgPostPerDay := float32(0.0)
+	if numPosts > 0 {
+		avgPostLen = int(postLenSum / numPosts)
+	}
+	if numPosts >= 2 {
+		newestDate, err := ParseDate(posts[0].Date)
+		if err == nil {
+			oldestDate, err := ParseDate(posts[len(posts)-1].Date)
+			if err == nil {
+				durationNs := float32(newestDate.Sub(oldestDate))
+				durationDays := durationNs / 1000 / 1000 / 60 / 60 / 24
+				if durationDays > 0 {
+					avgPostPerDay = float32(numPosts) / durationDays
+				}
+			}
+		}
+	}
+	return numPosts, avgPostLen, avgPostPerDay
 }
 
 func (c *Crawler) OnXML_AtomEntry(r *colly.Request, entry *xmlquery.Node, feed_language string) ([]*PostFrontmatter, bool) {

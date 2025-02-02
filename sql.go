@@ -52,14 +52,17 @@ func (db *DB) TrackBlogroll(fm *BlogrollFrontmatter) {
 
 func (db *DB) TrackFeed(fm *FeedFrontmatter) {
 	feed := Feed{
-		Date:        fm.Date,
-		Description: fm.Description,
-		Title:       fm.Title,
-		FeedLink:    fm.Params.FeedLink,
-		FeedId:      fm.Params.Id,
-		FeedType:    fm.Params.FeedType,
-		IsPodcast:   fm.Params.IsPodcast,
-		IsNoarchive: fm.Params.IsNoarchive,
+		Date:          fm.Date,
+		Description:   fm.Description,
+		Title:         fm.Title,
+		FeedLink:      fm.Params.FeedLink,
+		FeedId:        fm.Params.Id,
+		FeedType:      fm.Params.FeedType,
+		IsPodcast:     fm.Params.IsPodcast,
+		IsNoarchive:   fm.Params.IsNoarchive,
+		PostCount:     fm.Params.PostCount,
+		AvgPostLen:    fm.Params.AvgPostLen,
+		AvgPostPerDay: fm.Params.AvgPostPerDay,
 	}
 
 	result := db.db.
@@ -197,15 +200,18 @@ type Blogroll struct {
 }
 
 type Feed struct {
-	ID          uint   `gorm:"primaryKey"`
-	Date        string // TODO: use time.Time
-	Description string
-	Title       string
-	FeedLink    string `gorm:"unique"`
-	FeedId      string
-	FeedType    string
-	IsPodcast   bool
-	IsNoarchive bool
+	ID            uint   `gorm:"primaryKey"`
+	Date          string // TODO: use time.Time
+	Description   string
+	Title         string
+	FeedLink      string `gorm:"unique"`
+	FeedId        string
+	FeedType      string
+	IsPodcast     bool
+	IsNoarchive   bool
+	PostCount     int
+	AvgPostLen    int
+	AvgPostPerDay float32
 }
 
 type Post struct {

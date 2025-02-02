@@ -72,8 +72,6 @@ func (c *Crawler) OnXML_RssChannel(headers *http.Header, r *colly.Request, chann
 	log.Println("DEPTH:", r.Depth)
 	isDirect := r.Depth < 4
 
-	c.SaveFeed(feed, isDirect)
-
 	// Check for blogrolls
 	for _, blogroll := range blogrollUrls {
 		log.Printf("Found blogroll: %s", blogroll)
@@ -85,19 +83,24 @@ func (c *Crawler) OnXML_RssChannel(headers *http.Header, r *colly.Request, chann
 		c.Request(NODE_TYPE_FEED, feed_url, NODE_TYPE_WEBSITE, link, LINK_TYPE_FROM_FEED, r.Depth+1)
 	}
 
-	c.CollectRssItems(r, channel, language)
+	postCount, avgPostLen, avgPostPerDay := c.CollectRssItems(r, channel, language)
+	feed.WithPostCount(postCount)
+	feed.WithAvgPostLen(avgPostLen)
+	feed.WithAvgPostPerDay(avgPostPerDay)
+	c.SaveFeed(feed, isDirect)
 }
 
-func (c *Crawler) CollectRssItems(r *colly.Request, channel *xmlquery.Node, feed_language string) {
+func (c *Crawler) CollectRssItems(r *colly.Request, channel *xmlquery.Node, feed_language string) (int, int, float32) {
 	if r.Depth > c.Config.PostCollectionDepth {
-		return
+		return 0, 0, 0.0
 	}
 	if c.Config.MaxPostsPerFeed < 1 {
-		return
+		return 0, 0, 0.0
 	}
 
 	posts := []*PostFrontmatter{}
 	xmlItems := xmlquery.Find(channel, "//item")
+
 	for _, item := range xmlItems {
 		post, ok := c.OnXML_RssItem(r, item, feed_language)
 		if ok {
@@ -110,11 +113,39 @@ func (c *Crawler) CollectRssItems(r *colly.Request, channel *xmlquery.Node, feed
 		return cmpDateStr(b.Date, a.Date)
 	})
 
+	// TODO remove posts from the future
+
+	postLenSum := 0
 	for i, post := range posts {
+		postLenSum += len(post.Params.Content)
 		if i < c.Config.MaxPostsPerFeed {
 			c.SavePost(post)
 		}
 	}
+
+	numPosts := len(posts)
+	avgPostLen := 0
+	avgPostPerDay := float32(0.0)
+	if numPosts > 0 {
+		avgPostLen = int(postLenSum / numPosts)
+	}
+	if numPosts >= 2 {
+		newestDate, err := ParseDate(posts[0].Date)
+		if err == nil {
+			oldestDate, err := ParseDate(posts[len(posts)-1].Date)
+			if err == nil {
+				durationNs := float32(newestDate.Sub(oldestDate))
+				durationDays := durationNs / 1000 / 1000 / 60 / 60 / 24
+				if durationDays > 0 {
+					avgPostPerDay = float32(numPosts) / durationDays
+				}
+			}
+		}
+	}
+
+	// TODO: Additional stats: oldest post, newest pos
+	// TODO: lastActive
+	return numPosts, avgPostLen, avgPostPerDay
 }
 
 func (c *Crawler) OnXML_RssItem(r *colly.Request, item *xmlquery.Node, feed_language string) (*PostFrontmatter, bool) {

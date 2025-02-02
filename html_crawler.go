@@ -43,6 +43,7 @@ func (c *Crawler) OnHTML(element *colly.HTMLElement) {
 		}
 	}
 
+	// TODO, can I merge the QS as "link,a" ?
 	linkSel := element.DOM.Find("link")
 	for i := range linkSel.Nodes {
 		single := linkSel.Eq(i)

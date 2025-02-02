@@ -74,15 +74,18 @@ type FeedFrontmatter struct {
 }
 
 type FeedParams struct {
-	IsPodcast   bool     `yaml:"ispodcast"`
-	IsNoarchive bool     `yaml:"isnoarchive"`
-	FeedLink    string   `yaml:"feedlink"`
-	Id          string   `yaml:"id"`
-	Link        string   `yaml:"link"`
-	BlogRolls   []string `yaml:"blogrolls"`
-	FeedType    string   `yaml:"feedtype"`
-	Categories  []string `yaml:"categories"`
-	Language    string   `yaml:"language"`
+	IsPodcast     bool     `yaml:"ispodcast"`
+	IsNoarchive   bool     `yaml:"isnoarchive"`
+	FeedLink      string   `yaml:"feedlink"`
+	Id            string   `yaml:"id"`
+	Link          string   `yaml:"link"`
+	BlogRolls     []string `yaml:"blogrolls"`
+	FeedType      string   `yaml:"feedtype"`
+	Categories    []string `yaml:"categories"`
+	Language      string   `yaml:"language"`
+	PostCount     int      `yaml:"postcount"`
+	AvgPostLen    int      `yaml:"avgpostlen"`
+	AvgPostPerDay float32  `yaml:"avgpostperday"`
 }
 
 func NewFeedFrontmatter(feed_url string) *FeedFrontmatter {
@@ -135,6 +138,18 @@ func (f *FeedFrontmatter) WithLanguage(language string) {
 	if err == nil {
 		f.Params.Language = lang
 	}
+}
+
+func (f *FeedFrontmatter) WithAvgPostLen(l int) {
+	f.Params.AvgPostLen = l
+}
+
+func (f *FeedFrontmatter) WithAvgPostPerDay(avg float32) {
+	f.Params.AvgPostPerDay = avg
+}
+
+func (f *FeedFrontmatter) WithPostCount(count int) {
+	f.Params.PostCount = count
 }
 
 func (f *FeedFrontmatter) WithBlogRolls(links []string) {
