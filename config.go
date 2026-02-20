@@ -8,8 +8,16 @@ import (
 	"time"
 )
 
+type NonOpmlBlogroll struct {
+	Url      string `yaml:"url"`
+	Handler  string `yaml:"handler"`
+	Settings string `yaml:"settings"`
+}
+
+
 type Config struct {
 	FeedUrls []string `yaml:"feed_urls"`
+	NonOpmlBlogroll []NonOpmlBlogroll `yaml:"non_opml_blogroll_urls"`
 
 	PrivateBlocksFile string `yaml:"private_blocks_file"`
 
@@ -117,6 +125,16 @@ func (c *Config) Parse() *ParsedConfig {
 	out.BlockWords = c.BlockWords
 	out.BlockDomains = c.BlockDomains
 
+	for _, source := range c.NonOpmlBlogroll {
+		if source.Handler == "jq" {
+			for _, url := range jqProcessUrl(source.Url, source.Settings) {
+				out.FeedUrls = append(out.FeedUrls, url)
+			}
+		}
+	}
+	// We'll likely have duplicates here
+	out.FeedUrls = dedupeSlice(out.FeedUrls)
+
 	out.BlockPosts = make(map[string]bool, len(c.BlockPosts))
 	for _, blockTerm := range c.BlockPosts {
 		out.BlockPosts[blockTerm] = true
@@ -182,6 +200,7 @@ func (c *Config) Parse() *ParsedConfig {
 
 type ParsedConfig struct {
 	FeedUrls []string
+
 
 	BlockWords   []string
 	BlockDomains []string
